@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
-import { MockMarketProvider } from '../providers/market/mock.js'
+import { getMarketProvider } from '../providers/market/index.js'
 
-const marketProvider = new MockMarketProvider()
+const marketProvider = getMarketProvider()
 
 export async function marketRoutes(app: FastifyInstance) {
   app.get('/api/market/status', async () => {
