@@ -1,3 +1,4 @@
+import './db/database.js'
 import { marketRoutes } from './routes/market.js'
 
 import Fastify from 'fastify'
@@ -16,4 +17,5 @@ export function buildServer() {
   app.register(healthRoutes)
   app.register(marketRoutes)
   return app
+
 }

@@ -6,3 +6,15 @@ dist/
 npm-debug.log*
 .DS_Store
 iqtf.log
+
+/src/generated/prisma
+# Local SQLite database
+*.db
+*.db-shm
+*.db-wal
+
+# Local Prisma/AI tooling artifacts
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
