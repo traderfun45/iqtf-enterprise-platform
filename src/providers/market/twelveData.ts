@@ -3,11 +3,16 @@ import type { MarketProvider, MarketQuote } from './types.js'
 function mapSymbol(symbol: string): string {
   const normalized = symbol.toUpperCase().replace(/\s+/g, '')
 
-  if (normalized === 'XAUUSD') {
-    return 'XAU/USD'
-  }
+  switch (normalized) {
+    case 'XAUUSD':
+      return 'XAU/USD'
 
-  return normalized
+    case 'EURUSD':
+      return 'EUR/USD'
+
+    default:
+      return normalized
+  }
 }
 
 export class TwelveDataMarketProvider implements MarketProvider {
@@ -20,12 +25,14 @@ export class TwelveDataMarketProvider implements MarketProvider {
     const timeout = setTimeout(() => controller.abort(), 10000)
 
     try {
-      const response = await fetch(
-        `https://api.twelvedata.com/price?symbol=${encodeURIComponent(providerSymbol)}&apikey=${encodeURIComponent(this.apiKey)}`,
-        {
-          signal: controller.signal
-        }
-      )
+      const url =
+        `https://api.twelvedata.com/price` +
+        `?symbol=${encodeURIComponent(providerSymbol)}` +
+        `&apikey=${encodeURIComponent(this.apiKey)}`
+
+      const response = await fetch(url, {
+        signal: controller.signal
+      })
 
       if (!response.ok) {
         throw new Error(`Twelve Data HTTP error: ${response.status}`)
