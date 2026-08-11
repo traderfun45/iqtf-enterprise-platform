@@ -18,12 +18,26 @@ export async function marketRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get('/api/market/quote', async (request) => {
+  app.get('/api/market/quote', async (request, reply) => {
     const { symbol = 'XAUUSD' } = request.query as {
       symbol?: string
     }
 
-    return marketProvider.getQuote(symbol)
+    const normalizedSymbol = symbol.trim().toUpperCase()
+
+    if (!normalizedSymbol) {
+      return reply.code(400).send({
+        error: 'Symbol is required'
+      })
+    }
+
+    if (normalizedSymbol.length > 20) {
+      return reply.code(400).send({
+        error: 'Invalid symbol'
+      })
+    }
+
+    return marketProvider.getQuote(normalizedSymbol)
   })
 
   app.get('/api/markets', async () => {
