@@ -37,7 +37,24 @@ export async function marketRoutes(app: FastifyInstance) {
       })
     }
 
-    return marketProvider.getQuote(normalizedSymbol)
+    try {
+  return await marketProvider.getQuote(normalizedSymbol)
+} catch (error) {
+  const message =
+    error instanceof Error ? error.message : 'Market provider error'
+
+  if (message.includes('HTTP error: 404')) {
+    return reply.code(404).send({
+      error: 'Market symbol not found'
+    })
+  }
+
+  request.log.error(error)
+
+  return reply.code(502).send({
+    error: 'Market provider unavailable'
+  })
+}
   })
 
   app.get('/api/markets', async () => {
