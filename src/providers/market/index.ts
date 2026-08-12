@@ -1,6 +1,7 @@
 import type { MarketProvider } from './types.js'
 import { MockMarketProvider } from './mock.js'
 import { TwelveDataMarketProvider } from './twelveData.js'
+import { CmeMarketProvider } from './cme.js'
 
 const defaultProviderName = process.env.MARKET_PROVIDER ?? 'mock'
 const apiKey = process.env.TWELVEDATA_API_KEY ?? ''
@@ -14,6 +15,10 @@ function createMarketProvider(providerName: string): MarketProvider {
     }
 
     return new TwelveDataMarketProvider(apiKey)
+  }
+
+  if (providerName === 'cme') {
+    return new CmeMarketProvider()
   }
 
   if (providerName === 'mock') {
