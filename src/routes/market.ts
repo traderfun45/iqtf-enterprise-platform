@@ -164,4 +164,147 @@ try {
       data: market
     })
   })
+
+  app.get('/api/market/history', async (request, reply) => {
+    const query = request.query as {
+      symbol?: string
+      interval?: string
+      outputsize?: string
+      startDate?: string
+      endDate?: string
+    }
+
+    const symbol = query.symbol?.trim().toUpperCase()
+
+    if (!symbol) {
+      return reply.code(400).send({
+        error: 'Symbol is required'
+      })
+    }
+
+    const market = getMarketBySymbol(symbol)
+
+    if (!market) {
+      return reply.code(404).send({
+        error: 'Market symbol not found'
+      })
+    }
+
+    try {
+      const provider = getMarketProvider(
+        market.provider ?? 'mock'
+      )
+
+      if (typeof provider.getHistory !== 'function') {
+        return reply.code(501).send({
+          error: 'Historical data is not supported by this provider',
+          symbol,
+          provider: market.provider ?? 'unknown'
+        })
+      }
+
+      const outputsize = query.outputsize
+        ? Number(query.outputsize)
+        : undefined
+
+      if (
+        outputsize !== undefined &&
+        (!Number.isInteger(outputsize) || outputsize < 1)
+      ) {
+        return reply.code(400).send({
+          error: 'outputsize must be a positive integer'
+        })
+      }
+
+      const data = await provider.getHistory(symbol, {
+        interval: query.interval ?? '1h',
+        outputsize,
+        startDate: query.startDate,
+        endDate: query.endDate
+      })
+
+      return {
+        symbol,
+        provider: market.provider ?? 'unknown',
+        interval: query.interval ?? '1h',
+        count: data.length,
+        data,
+        timestamp: new Date().toISOString()
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Market history error'
+
+      request.log.error(error)
+
+      return reply.code(502).send({
+        error: 'Market history unavailable',
+        symbol,
+        message
+      })
+    }
+  })
+
+  app.get('/api/market/relationship', async (request, reply) => {
+    const { base = 'GC', quote = 'XAUUSD' } = request.query as {
+      base?: string
+      quote?: string
+    }
+
+    const baseSymbol = base.trim().toUpperCase()
+    const quoteSymbol = quote.trim().toUpperCase()
+
+    if (!baseSymbol || !quoteSymbol) {
+      return reply.code(400).send({
+        error: 'Base and quote symbols are required'
+      })
+    }
+
+    const baseMarket = getMarketBySymbol(baseSymbol)
+    const quoteMarket = getMarketBySymbol(quoteSymbol)
+
+    if (!baseMarket || !quoteMarket) {
+      return reply.code(404).send({
+        error: 'Market symbol not found'
+      })
+    }
+
+    try {
+      const baseProvider = getMarketProvider(
+        baseMarket.provider ?? 'mock'
+      )
+
+      const quoteProvider = getMarketProvider(
+        quoteMarket.provider ?? 'mock'
+      )
+
+      const [baseQuote, quoteQuote] = await Promise.all([
+        baseProvider.getQuote(baseSymbol),
+        quoteProvider.getQuote(quoteSymbol)
+      ])
+
+      const { calculateMarketRelationship } =
+        await import('../providers/market/relationship.js')
+
+      return calculateMarketRelationship(
+        baseQuote,
+        quoteQuote
+      )
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Market relationship error'
+
+      request.log.error(error)
+
+      return reply.code(502).send({
+        error: 'Market relationship unavailable',
+        message
+      })
+    }
+  })
+
 }
