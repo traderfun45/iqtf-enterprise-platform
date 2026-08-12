@@ -17,7 +17,47 @@ export async function marketRoutes(app: FastifyInstance) {
       timestamp: new Date().toISOString()
     }
   })
+app.get('/api/market/snapshot', async (request) => {
+  const markets = listMarkets()
 
+  const data = await Promise.all(
+    markets.map(async (market) => {
+      try {
+        const provider = getMarketProvider(market.provider ?? 'mock')
+        const quote = await provider.getQuote(market.symbol)
+
+        return {
+          ...quote,
+          status: 'ok'
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Market provider error'
+
+        request.log.warn(
+          {
+            symbol: market.symbol,
+            provider: market.provider,
+            error: message
+          },
+          'Market snapshot quote unavailable'
+        )
+
+        return {
+          symbol: market.symbol,
+          status: 'unavailable',
+          source: market.provider ?? 'unknown',
+          error: message
+        }
+      }
+    })
+  )
+
+  return {
+    data,
+    timestamp: new Date().toISOString()
+  }
+})
   app.get('/api/market/quote', async (request, reply) => {
     const { symbol = 'XAUUSD' } = request.query as {
       symbol?: string
@@ -25,7 +65,7 @@ export async function marketRoutes(app: FastifyInstance) {
 
     const normalizedSymbol = symbol.trim().toUpperCase()
 
-    if (!normalizedSymbol) {
+   if (!normalizedSymbol) {
       return reply.code(400).send({
         error: 'Symbol is required'
       })
