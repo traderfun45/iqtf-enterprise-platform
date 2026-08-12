@@ -6,7 +6,7 @@ import {
   createMarket
 } from '../db/markets.js'
 
-const marketProvider = getMarketProvider()
+
 
 export async function marketRoutes(app: FastifyInstance) {
   app.get('/api/market/status', async () => {
@@ -37,7 +37,17 @@ export async function marketRoutes(app: FastifyInstance) {
       })
     }
 
-    try {
+    const market = getMarketBySymbol(normalizedSymbol)
+
+if (!market) {
+  return reply.code(404).send({
+    error: 'Market symbol not found'
+  })
+}
+
+try {
+  const marketProvider = getMarketProvider(market.provider ?? 'mock')
+
   return await marketProvider.getQuote(normalizedSymbol)
 } catch (error) {
   const message =
