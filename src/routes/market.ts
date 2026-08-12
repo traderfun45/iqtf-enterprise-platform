@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { getMarketProvider } from '../providers/market/index.js'
+import { calculateMarketIntelligence } from '../services/market/intelligence.js'
 import {
   listMarkets,
   getMarketBySymbol,
@@ -163,6 +164,74 @@ try {
     return reply.code(201).send({
       data: market
     })
+  })
+
+  app.get("/api/market/intelligence", async (request, reply) => {
+    const query = request.query as {
+      symbol?: string
+      interval?: string
+      outputsize?: string
+    }
+
+    const symbol = query.symbol?.trim().toUpperCase()
+
+    if (!symbol) {
+      return reply.code(400).send({ error: "Symbol is required" })
+    }
+
+    const market = getMarketBySymbol(symbol)
+
+    if (!market) {
+      return reply.code(404).send({ error: "Market symbol not found" })
+    }
+
+    try {
+      const provider = getMarketProvider(market.provider ?? "mock")
+
+      if (typeof provider.getHistory !== "function") {
+        return reply.code(501).send({
+          error: "Historical data is not supported by this provider",
+          symbol,
+          provider: market.provider ?? "unknown"
+        })
+      }
+
+      const outputsize = query.outputsize
+        ? Number(query.outputsize)
+        : 50
+
+      if (!Number.isInteger(outputsize) || outputsize < 2) {
+        return reply.code(400).send({
+          error: "outputsize must be an integer >= 2"
+        })
+      }
+
+      const candles = await provider.getHistory(symbol, {
+        interval: query.interval ?? "1h",
+        outputsize
+      })
+
+      const intelligence = calculateMarketIntelligence(candles)
+
+      return {
+        ...intelligence,
+        interval: query.interval ?? "1h",
+        candleCount: candles.length
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Market intelligence error"
+
+      request.log.error(error)
+
+      return reply.code(502).send({
+        error: "Market intelligence unavailable",
+        symbol,
+        message
+      })
+    }
   })
 
   app.get('/api/market/history', async (request, reply) => {
