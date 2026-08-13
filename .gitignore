@@ -39,3 +39,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IQTF Enterprise runtime / local data
+/dist/
+/*.db
+/*.db-shm
+/*.db-wal
+/*.log
+
+# Local AI / coding agent configuration
+/.agents/
+/.claude/
+/.windsurf/
+
+# Local skill lock
+/skills-lock.json
