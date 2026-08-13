@@ -1,69 +1,271 @@
-import Image from "next/image";
+import {
+  Activity,
+  ArrowDownRight,
+  ArrowUpRight,
+  BarChart3,
+  ShieldCheck,
+  Target,
+  TrendingUp,
+  Wallet,
+} from "lucide-react"
+
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AppShell } from "@/components/layout/app-shell"
+
+const kpis = [
+  {
+    title: "Account Balance",
+    value: "$125,430.00",
+    change: "+4.82%",
+    icon: Wallet,
+    positive: true,
+  },
+  {
+    title: "Equity",
+    value: "$128,100.00",
+    change: "+2.14%",
+    icon: TrendingUp,
+    positive: true,
+  },
+  {
+    title: "Today's P/L",
+    value: "+$1,820.00",
+    change: "+1.45%",
+    icon: BarChart3,
+    positive: true,
+  },
+  {
+    title: "Win Rate",
+    value: "78.4%",
+    change: "+3.2%",
+    icon: Target,
+    positive: true,
+  },
+]
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <AppShell>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+              >
+                LIVE
+              </Badge>
+              <span className="text-xs text-zinc-500">
+                Institutional Trading System
+              </span>
+            </div>
+
+            <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+              Executive Dashboard
+            </h1>
+
+            <p className="mt-1 text-sm text-zinc-500">
+              Institutional Quantitative Trading Framework
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-zinc-500">
+            <Activity className="h-4 w-4 text-emerald-400" />
+            Market system operational
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* KPI Cards */}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {kpis.map((kpi) => {
+            const Icon = kpi.icon
+
+            return (
+              <Card
+                key={kpi.title}
+                className="border-white/10 bg-white/[0.03] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/[0.05]"
+              >
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                    {kpi.title}
+                  </CardTitle>
+
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-2">
+                    <Icon className="h-4 w-4 text-zinc-300" />
+                  </div>
+                </CardHeader>
+
+                <CardContent>
+                  <div className="text-2xl font-bold tracking-tight text-white">
+                    {kpi.value}
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-1 text-xs text-emerald-400">
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                    {kpi.change}
+                    <span className="ml-1 text-zinc-600">
+                      vs previous period
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
-      </main>
-    </div>
-  );
+
+        {/* Main Grid */}
+        <div className="grid gap-4 xl:grid-cols-12">
+          {/* Market Overview */}
+          <Card className="border-white/10 bg-white/[0.03] xl:col-span-8">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base text-white">
+                  Market Overview
+                </CardTitle>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Multi-asset institutional market monitor
+                </p>
+              </div>
+
+              <Badge
+                variant="outline"
+                className="border-white/10 text-zinc-400"
+              >
+                LIVE DATA
+              </Badge>
+            </CardHeader>
+
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ["XAUUSD", "2,645.20", "+0.84%"],
+                  ["DXY", "103.42", "-0.31%"],
+                  ["US10Y", "4.21%", "+0.05%"],
+                  ["BTCUSD", "64,820", "+1.72%"],
+                ].map(([symbol, price, change]) => {
+                  const positive = change.startsWith("+")
+
+                  return (
+                    <div
+                      key={symbol}
+                      className="rounded-xl border border-white/10 bg-black/20 p-4 transition-all hover:bg-white/[0.04]"
+                    >
+                      <div className="text-xs font-medium text-zinc-500">
+                        {symbol}
+                      </div>
+
+                      <div className="mt-2 text-lg font-semibold text-white">
+                        {price}
+                      </div>
+
+                      <div
+                        className={`mt-1 text-xs ${
+                          positive ? "text-emerald-400" : "text-red-400"
+                        }`}
+                      >
+                        {change}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Risk Monitor */}
+          <Card className="border-white/10 bg-white/[0.03] xl:col-span-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base text-white">
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                Risk Monitor
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-500">Daily Risk</span>
+                  <span className="text-white">1.24%</span>
+                </div>
+
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full w-[31%] rounded-full bg-emerald-400" />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-500">Exposure</span>
+                  <span className="text-white">34.8%</span>
+                </div>
+
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full w-[35%] rounded-full bg-sky-400" />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+                <div>
+                  <div className="text-xs font-medium text-emerald-400">
+                    Risk Status
+                  </div>
+                  <div className="mt-1 text-xs text-zinc-500">
+                    Within institutional limits
+                  </div>
+                </div>
+
+                <div className="h-2 w-2 rounded-full bg-emerald-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Trading Status */}
+        <Card className="border-white/10 bg-white/[0.03]">
+          <CardHeader>
+            <CardTitle className="text-base text-white">
+              Trading System Status
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 p-4">
+                <div>
+                  <div className="text-xs text-zinc-500">Strategy Engine</div>
+                  <div className="mt-1 text-sm font-medium text-white">
+                    Active
+                  </div>
+                </div>
+                <ArrowUpRight className="h-4 w-4 text-emerald-400" />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 p-4">
+                <div>
+                  <div className="text-xs text-zinc-500">Market Feed</div>
+                  <div className="mt-1 text-sm font-medium text-white">
+                    Connected
+                  </div>
+                </div>
+                <Activity className="h-4 w-4 text-emerald-400" />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 p-4">
+                <div>
+                  <div className="text-xs text-zinc-500">Risk Engine</div>
+                  <div className="mt-1 text-sm font-medium text-white">
+                    Normal
+                  </div>
+                </div>
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </AppShell>
+  )
 }
