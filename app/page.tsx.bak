@@ -47,6 +47,28 @@ const kpis = [
 export default function Home() {
   return (
     <AppShell>
+  {(activeView) => {
+    if (activeView !== "Dashboard") {
+      return (
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="text-center">
+            <div className="mb-3 text-2xl font-bold text-white">
+              {activeView}
+            </div>
+
+            <p className="text-sm text-zinc-500">
+              IQTF Enterprise Module
+            </p>
+
+            <div className="mt-6 inline-flex rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-2 text-xs text-emerald-400">
+              Module Ready
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
       <div className="space-y-6">
         {/* Page Header */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -267,6 +289,7 @@ export default function Home() {
         </Card>
       </div>
      )
+   }}
     </AppShell>
   )
 }

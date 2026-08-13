@@ -1,0 +1,32 @@
+"use client"
+
+import { ReactNode, useState } from "react"
+import { AppHeader } from "./app-header"
+import { AppSidebar, View } from "./app-sidebar"
+
+interface AppShellProps {
+  children: (activeView: View) => ReactNode
+}
+
+export function AppShell({ children }: AppShellProps) {
+  const [activeView, setActiveView] = useState<View>("Dashboard")
+
+  return (
+    <div className="flex min-h-screen bg-zinc-950 text-white">
+      <AppSidebar
+        activeItem={activeView}
+        onNavigate={setActiveView}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AppHeader />
+
+        <main className="flex-1 overflow-auto">
+          <div className="mx-auto w-full max-w-[1800px] p-4 md:p-6">
+            {children(activeView)}
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
