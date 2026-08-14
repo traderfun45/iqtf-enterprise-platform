@@ -36,9 +36,11 @@ export default function MarketPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-    async function loadMarket() {
+    async function loadMarket(isInitialLoad = false) {
       try {
-        setLoading(true)
+        if (isInitialLoad) {
+          setLoading(true)
+        }
         setError(null)
 
         const [snapshotData, intelligenceData] = await Promise.all([
@@ -68,12 +70,14 @@ export default function MarketPage() {
             : "Unable to load market data"
         )
       } finally {
-        setLoading(false)
+        if (isInitialLoad) {
+          setLoading(false)
+        }
       }
     }
 
   useEffect(() => {
-    loadMarket()
+    loadMarket(true)
 
     const timer = setInterval(loadMarket, 30000)
 
@@ -116,7 +120,7 @@ export default function MarketPage() {
           </div>
 
           <button
-            onClick={loadMarket}
+            onClick={() => loadMarket(false)}
             disabled={loading}
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-zinc-300 transition hover:bg-white/[0.06] disabled:opacity-50"
           >
