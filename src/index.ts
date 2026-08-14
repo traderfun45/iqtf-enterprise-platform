@@ -4,7 +4,7 @@ import { buildServer } from './server.js'
 const app = buildServer()
 
 const port = Number(
-  process.env.PORT ?? process.env.API_PORT ?? 3000
+  process.env.PORT ?? process.env.API_PORT ?? 4000
 )
 
 const host = process.env.API_HOST ?? '0.0.0.0'
