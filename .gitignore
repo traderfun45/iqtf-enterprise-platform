@@ -54,3 +54,6 @@ next-env.d.ts
 
 # Local skill lock
 /skills-lock.json
+
+# IQTF production runtime
+/logs/
