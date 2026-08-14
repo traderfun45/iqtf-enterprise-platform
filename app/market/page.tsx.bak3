@@ -11,10 +11,39 @@ import {
   TrendingUp,
 } from "lucide-react"
 
-import { getMarketSnapshot, getMarketIntelligence, type Quote, type Intelligence } from "@/lib/market"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AppShell } from "@/components/layout/app-shell"
+
+type Quote = {
+  symbol: string
+  price: number
+  source: string
+  timestamp: string
+}
+
+type Intelligence = {
+  symbol: string
+  trend: {
+    direction: "bullish" | "bearish" | "neutral"
+    score: number
+  }
+  volatility: {
+    atr: number
+    atrPercent: number
+  }
+  momentum: {
+    value: number
+    score: number
+  }
+  score: number
+  signal: "bullish" | "bearish" | "neutral"
+  timestamp: string
+  interval: string
+  candleCount: number
+}
+
+const API = "http://127.0.0.1:3000"
 
 function formatPrice(value: number) {
   return value.toLocaleString(undefined, {
@@ -36,41 +65,44 @@ export default function MarketPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-    async function loadMarket() {
-      try {
-        setLoading(true)
-        setError(null)
+  async function loadMarket() {
+    try {
+      setLoading(true)
+      setError(null)
 
-        const [snapshotData, intelligenceData] = await Promise.all([
-          getMarketSnapshot(),
-          getMarketIntelligence("XAUUSD", "1h", 50),
+      const [xauRes, gcRes, intelligenceRes] =
+        await Promise.all([
+          fetch(`${API}/api/market/quote?symbol=XAUUSD`),
+          fetch(`${API}/api/market/quote?symbol=GC`),
+          fetch(
+            `${API}/api/market/intelligence?symbol=XAUUSD&interval=1h&outputsize=50`
+          ),
         ])
 
-        const xauData = snapshotData.data.find(
-          (item) => item.symbol === "XAUUSD"
-        )
-
-        const gcData = snapshotData.data.find(
-          (item) => item.symbol === "GC"
-        )
-
-        if (!xauData || !gcData) {
-          throw new Error("Market snapshot data unavailable")
-        }
-
-        setXau(xauData)
-        setGc(gcData)
-        setIntelligence(intelligenceData)
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load market data"
-        )
-      } finally {
-        setLoading(false)
+      if (!xauRes.ok || !gcRes.ok || !intelligenceRes.ok) {
+        throw new Error("Market API unavailable")
       }
+
+      const [xauData, gcData, intelligenceData] =
+        await Promise.all([
+          xauRes.json(),
+          gcRes.json(),
+          intelligenceRes.json(),
+        ])
+
+      setXau(xauData)
+      setGc(gcData)
+      setIntelligence(intelligenceData)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load market data"
+      )
+    } finally {
+      setLoading(false)
     }
+  }
 
   useEffect(() => {
     loadMarket()
@@ -139,7 +171,7 @@ export default function MarketPage() {
               </div>
 
               <p className="mt-1 text-xs text-zinc-500">
-                Make sure iqtf-enterprise API is running on port 4000.
+                Make sure iqtf-enterprise API is running on port 3000.
               </p>
             </CardContent>
           </Card>
