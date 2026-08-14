@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 import {
   Activity,
   BookOpen,
@@ -13,6 +14,8 @@ import {
   ShieldCheck,
   Wallet,
 } from "lucide-react"
+
+import { getSystemStatus, type SystemStatus } from "@/lib/system"
 
 const menuItems = [
   {
@@ -54,6 +57,37 @@ const menuItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+
+  const [system, setSystem] = useState<SystemStatus | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadSystem() {
+      try {
+        const data = await getSystemStatus()
+
+        if (mounted) {
+          setSystem(data)
+        }
+      } catch {
+        if (mounted) {
+          setSystem(null)
+        }
+      }
+    }
+
+    loadSystem()
+
+    const timer = setInterval(loadSystem, 15000)
+
+    return () => {
+      mounted = false
+      clearInterval(timer)
+    }
+  }, [])
+
+  const healthy = system?.status === "healthy"
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-zinc-950 md:flex md:flex-col">
@@ -137,10 +171,14 @@ export function AppSidebar() {
           <span>Settings</span>
         </Link>
 
-        {/* System Status */}
+        {/* Real System Status */}
         <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
           <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-emerald-400" />
+            <Activity
+              className={`h-4 w-4 ${
+                healthy ? "text-emerald-400" : "text-red-400"
+              }`}
+            />
 
             <span className="text-xs font-medium text-white">
               System Status
@@ -148,12 +186,56 @@ export function AppSidebar() {
           </div>
 
           <div className="mt-2 flex items-center gap-2">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+            <span
+              className={`h-2 w-2 rounded-full ${
+                healthy
+                  ? "animate-pulse bg-emerald-400"
+                  : "bg-red-400"
+              }`}
+            />
 
-            <span className="text-xs text-zinc-500">
-              All systems operational
+            <span
+              className={`text-xs ${
+                healthy ? "text-zinc-500" : "text-red-400"
+              }`}
+            >
+              {healthy
+                ? "All systems operational"
+                : "System unavailable"}
             </span>
           </div>
+
+          {system && (
+            <div className="mt-3 space-y-1 border-t border-white/5 pt-2">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-zinc-600">API</span>
+                <span className="text-emerald-400">
+                  {system.services.api}
+                </span>
+              </div>
+
+              <div className="flex justify-between text-[10px]">
+                <span className="text-zinc-600">Market</span>
+                <span className="text-emerald-400">
+                  {system.services.market}
+                </span>
+              </div>
+
+              <div className="flex justify-between text-[10px]">
+                <span className="text-zinc-600">Cache</span>
+                <span className="text-emerald-400">
+                  {system.services.cache}
+                </span>
+              </div>
+
+              <div className="flex justify-between text-[10px]">
+                <span className="text-zinc-600">Watchdog</span>
+                <span className="text-emerald-400">
+                  {system.services.watchdog}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Version */}
