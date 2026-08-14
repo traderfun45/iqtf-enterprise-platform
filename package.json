@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "api:dev": "tsx watch src/index.ts",
-    "api:start": "tsx src/index.ts"
+    "api:start": "tsx src/index.ts",
+    "api:build": "tsc -p tsconfig.server.json",
+    "api:start:prod": "node dist/index.js"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

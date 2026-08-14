@@ -6,6 +6,8 @@ import { CmeMarketProvider } from './cme.js'
 const defaultProviderName = process.env.MARKET_PROVIDER ?? 'mock'
 const apiKey = process.env.TWELVEDATA_API_KEY ?? ''
 
+const providers = new Map<string, MarketProvider>()
+
 function createMarketProvider(providerName: string): MarketProvider {
   if (providerName === 'twelvedata') {
     if (!apiKey) {
@@ -31,5 +33,15 @@ function createMarketProvider(providerName: string): MarketProvider {
 export function getMarketProvider(
   providerName: string = defaultProviderName
 ): MarketProvider {
-  return createMarketProvider(providerName)
+  const existing = providers.get(providerName)
+
+  if (existing) {
+    return existing
+  }
+
+  const provider = createMarketProvider(providerName)
+
+  providers.set(providerName, provider)
+
+  return provider
 }
