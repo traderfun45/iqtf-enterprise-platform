@@ -499,7 +499,102 @@ function getActionContext(
   }
 }
 
+function getExecutiveSummary(
+  data: Intelligence | null,
+  decision: ReturnType<typeof getDecision>,
+  riskPosition: ReturnType<typeof getRiskPositionContext>,
+  tradePlan: ReturnType<typeof getTradePlan>,
+  monitoring: ReturnType<typeof getMonitoringContext>,
+  alert: ReturnType<typeof getAlertContext>,
+  actionContext: ReturnType<typeof getActionContext>
+) {
+  if (!data) {
+    return {
+      regime: "UNKNOWN",
+      bias: "NEUTRAL",
+      risk: "UNKNOWN",
+      action: "WAIT",
+      verdict: "LIVE MARKET DATA REQUIRED",
+      current: "Waiting for live intelligence",
+      next: "Wait for live market data",
+      invalidation: "No decision can be validated without live data",
+    }
+  }
+
+  const bias =
+    monitoring.scenario === "BULLISH"
+      ? "BULLISH"
+      : monitoring.scenario === "BEARISH"
+        ? "BEARISH"
+        : "NEUTRAL"
+
+  const risk =
+    alert.level === "HIGH"
+      ? "HIGH"
+      : riskPosition.readiness === "CONFIRMED"
+        ? "ELEVATED"
+        : "CONTROLLED"
+
+  let verdict = "NEUTRAL — WAIT FOR CONFIRMATION"
+
+  if (
+    actionContext.action === "PREPARE LONG" &&
+    monitoring.confirmation === "CONFIRMED"
+  ) {
+    verdict = "LONG SCENARIO — WAIT FOR TRIGGER"
+  } else if (
+    actionContext.action === "PREPARE SHORT" &&
+    monitoring.confirmation === "CONFIRMED"
+  ) {
+    verdict = "SHORT SCENARIO — WAIT FOR TRIGGER"
+  } else if (alert.level === "HIGH") {
+    verdict = "RISK ELEVATED — PROTECT CAPITAL"
+  } else if (bias === "BULLISH") {
+    verdict = "BULLISH BIAS — CONFIRM MOMENTUM"
+  } else if (bias === "BEARISH") {
+    verdict = "BEARISH BIAS — CONFIRM MOMENTUM"
+  }
+
+  let current = "Market conditions remain neutral"
+
+  if (bias === "BULLISH") {
+    current = "Bullish structure is active"
+  } else if (bias === "BEARISH") {
+    current = "Bearish structure is active"
+  } else if (data.trend.direction === "bullish") {
+    current = "Bullish trend exists but confirmation is incomplete"
+  } else if (data.trend.direction === "bearish") {
+    current = "Bearish trend exists but confirmation is incomplete"
+  }
+
+  let next = actionContext.nextStep
+
+  if (monitoring.confirmation === "DEVELOPING") {
+    next = monitoring.watch
+  }
+
+  let invalidation = monitoring.invalidation
+
+  if (tradePlan.direction === "LONG") {
+    invalidation = "Long thesis invalidates if bullish structure fails"
+  } else if (tradePlan.direction === "SHORT") {
+    invalidation = "Short thesis invalidates if bearish structure fails"
+  }
+
+  return {
+    regime: monitoring.regime,
+    bias,
+    risk,
+    action: actionContext.action,
+    verdict,
+    current,
+    next,
+    invalidation,
+  }
+}
+
 export default function AIAnalysisPage() {
+
   const [data, setData] = useState<Intelligence | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -658,6 +753,32 @@ export default function AIAnalysisPage() {
       : actionContext.priority === "MEDIUM"
         ? "text-yellow-400"
         : "text-sky-400"
+
+  const executiveSummary = getExecutiveSummary(
+    data,
+    decision,
+    riskPosition,
+    tradePlan,
+    monitoring,
+    alert,
+    actionContext
+  )
+
+  const executiveBiasColor =
+    executiveSummary.bias === "BULLISH"
+      ? "text-emerald-400"
+      : executiveSummary.bias === "BEARISH"
+        ? "text-red-400"
+        : "text-zinc-300"
+
+  const executiveRiskColor =
+    executiveSummary.risk === "HIGH"
+      ? "text-red-400"
+      : executiveSummary.risk === "ELEVATED"
+        ? "text-yellow-400"
+        : executiveSummary.risk === "CONTROLLED"
+          ? "text-emerald-400"
+          : "text-zinc-300"
 
   return (
     <div className="space-y-6 p-6">
@@ -1163,6 +1284,119 @@ export default function AIAnalysisPage() {
             intelligence, confirmation state, and volatility regime.
           </div>
         )}
+      </div>
+
+      {/* Executive Command Center */}
+      <div className="rounded-xl border border-sky-500/20 bg-zinc-950 p-6">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="text-sky-400" />
+
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Executive Command Center
+            </h2>
+
+            <p className="text-xs text-zinc-500">
+              Consolidated decision state from live market intelligence
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-lg border border-white/5 bg-white/[0.02] p-5">
+          <p className="text-xs uppercase tracking-wider text-zinc-500">
+            Executive Verdict
+          </p>
+
+          <p className="mt-2 text-2xl font-bold text-white">
+            {executiveSummary.verdict}
+          </p>
+
+          <p className="mt-2 text-sm text-zinc-400">
+            {executiveSummary.current}
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Market Regime
+            </p>
+
+            <p className="mt-2 text-xl font-bold text-white">
+              {executiveSummary.regime}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Current Bias
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${executiveBiasColor}`}>
+              {executiveSummary.bias}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Risk State
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${executiveRiskColor}`}>
+              {executiveSummary.risk}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Recommended Action
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${actionColor}`}>
+              {executiveSummary.action}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+            <p className="text-xs text-zinc-500">
+              What Matters Now
+            </p>
+
+            <p className="mt-2 text-sm font-medium text-zinc-300">
+              {executiveSummary.current}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+            <p className="text-xs text-zinc-500">
+              What Must Happen Next
+            </p>
+
+            <p className="mt-2 text-sm font-medium text-zinc-300">
+              {executiveSummary.next}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+            <p className="text-xs text-zinc-500">
+              View Invalidation
+            </p>
+
+            <p className="mt-2 text-sm font-medium text-zinc-300">
+              {executiveSummary.invalidation}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-sky-500/10 bg-sky-500/[0.03] p-4 text-sm text-zinc-400">
+          <span className="font-semibold text-white">
+            Executive policy:
+          </span>{" "}
+          The command center summarizes live conditions only. It does not
+          authorize automatic order execution.
+        </div>
       </div>
 
       {/* Executive Monitoring & Scenario Layer */}
