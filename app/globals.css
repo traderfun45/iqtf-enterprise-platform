@@ -173,3 +173,19 @@ button {
 *::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* IQTF Enterprise Dark Theme */
+html,
+body {
+  background-color: #09090b !important;
+  color: #f4f4f5 !important;
+}
+
+body {
+  color-scheme: dark;
+}
+
+.card,
+[data-slot="card"] {
+  color: #f4f4f5;
+}
