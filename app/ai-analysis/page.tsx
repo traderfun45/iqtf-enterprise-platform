@@ -593,7 +593,123 @@ function getExecutiveSummary(
   }
 }
 
+function getSignalConfidence(
+  data: Intelligence | null,
+  decision: ReturnType<typeof getDecision>,
+  riskPosition: ReturnType<typeof getRiskPositionContext>,
+  monitoring: ReturnType<typeof getMonitoringContext>,
+  alert: ReturnType<typeof getAlertContext>
+) {
+  if (!data) {
+    return {
+      confidence: 0,
+      quality: "UNAVAILABLE",
+      trendAlignment: 0,
+      momentumAlignment: 0,
+      volatilityQuality: 0,
+      decisionAlignment: 0,
+      riskAlignment: 0,
+      reason: "Live intelligence data is required",
+      weakness: "No live market data",
+    }
+  }
+
+  const trendScore = Math.abs(data.trend.score)
+  const momentumScore = Math.abs(data.momentum.score)
+  const atrPercent = data.volatility.atrPercent
+
+  const trendAlignment = Math.min(100, trendScore * 500)
+  const momentumAlignment = Math.min(100, momentumScore * 500)
+
+  let volatilityQuality = 70
+
+  if (atrPercent >= 0.5) {
+    volatilityQuality = 25
+  } else if (atrPercent >= 0.35) {
+    volatilityQuality = 50
+  } else if (atrPercent < 0.15) {
+    volatilityQuality = 55
+  }
+
+  let decisionAlignment = 50
+
+  if (decision.action !== "WAIT") {
+    decisionAlignment = monitoring.confirmation === "CONFIRMED"
+      ? 100
+      : monitoring.confirmation === "DEVELOPING"
+        ? 65
+        : 35
+  } else if (monitoring.confirmation === "WAITING") {
+    decisionAlignment = 70
+  }
+
+  let riskAlignment = 70
+
+  if (alert.level === "HIGH") {
+    riskAlignment = 30
+  } else if (riskPosition.readiness === "CONFIRMED") {
+    riskAlignment = 90
+  } else if (riskPosition.readiness === "WATCH") {
+    riskAlignment = 65
+  }
+
+  const confidence = Math.round(
+    trendAlignment * 0.30 +
+    momentumAlignment * 0.25 +
+    volatilityQuality * 0.15 +
+    decisionAlignment * 0.20 +
+    riskAlignment * 0.10
+  )
+
+  let quality = "WEAK"
+
+  if (confidence >= 75) {
+    quality = "STRONG"
+  } else if (confidence >= 50) {
+    quality = "MODERATE"
+  }
+
+  let reason = "Multiple market factors are aligned"
+
+  if (confidence >= 75) {
+    reason = "Trend, momentum, decision and risk conditions are strongly aligned"
+  } else if (confidence >= 50) {
+    reason = "Some conditions are aligned, but confirmation remains incomplete"
+  } else {
+    reason = "Directional evidence is weak and confirmation is incomplete"
+  }
+
+  let weakness = "No major weakness detected"
+
+  if (momentumAlignment < 35) {
+    weakness = "Momentum confirmation is weak"
+  } else if (trendAlignment < 35) {
+    weakness = "Trend strength is weak"
+  } else if (volatilityQuality < 40) {
+    weakness = "Volatility conditions reduce signal quality"
+  } else if (decisionAlignment < 50) {
+    weakness = "Decision and market confirmation are not aligned"
+  } else if (riskAlignment < 50) {
+    weakness = "Risk conditions reduce decision quality"
+  } else if (monitoring.scenario === "NEUTRAL") {
+    weakness = "No clear directional scenario is active"
+  }
+
+  return {
+    confidence,
+    quality,
+    trendAlignment: Math.round(trendAlignment),
+    momentumAlignment: Math.round(momentumAlignment),
+    volatilityQuality,
+    decisionAlignment,
+    riskAlignment,
+    reason,
+    weakness,
+  }
+}
+
 export default function AIAnalysisPage() {
+
 
   const [data, setData] = useState<Intelligence | null>(null)
   const [loading, setLoading] = useState(true)
@@ -779,6 +895,23 @@ export default function AIAnalysisPage() {
         : executiveSummary.risk === "CONTROLLED"
           ? "text-emerald-400"
           : "text-zinc-300"
+
+  const signalConfidence = getSignalConfidence(
+    data,
+    decision,
+    riskPosition,
+    monitoring,
+    alert
+  )
+
+  const confidenceColor =
+    signalConfidence.quality === "STRONG"
+      ? "text-emerald-400"
+      : signalConfidence.quality === "MODERATE"
+        ? "text-yellow-400"
+        : signalConfidence.quality === "WEAK"
+          ? "text-red-400"
+          : "text-zinc-400"
 
   return (
     <div className="space-y-6 p-6">
@@ -1282,6 +1415,121 @@ export default function AIAnalysisPage() {
             </span>{" "}
             The plan remains conditional and follows the current
             intelligence, confirmation state, and volatility regime.
+          </div>
+        )}
+      </div>
+
+      {/* Signal Confidence & Decision Quality */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="text-violet-400" />
+
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Signal Confidence & Decision Quality
+            </h2>
+
+            <p className="text-xs text-zinc-500">
+              Confidence derived from trend, momentum, volatility, decision and risk alignment
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Signal Confidence
+            </p>
+
+            <p className={`mt-2 text-2xl font-bold ${confidenceColor}`}>
+              {signalConfidence.confidence}%
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Decision Quality
+            </p>
+
+            <p className={`mt-2 text-2xl font-bold ${confidenceColor}`}>
+              {signalConfidence.quality}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Trend Alignment
+            </p>
+
+            <p className="mt-2 text-2xl font-bold text-white">
+              {signalConfidence.trendAlignment}%
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Momentum Alignment
+            </p>
+
+            <p className="mt-2 text-2xl font-bold text-white">
+              {signalConfidence.momentumAlignment}%
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+            <p className="text-xs text-zinc-500">
+              Volatility Quality
+            </p>
+
+            <p className="mt-2 text-xl font-bold text-white">
+              {signalConfidence.volatilityQuality}%
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+            <p className="text-xs text-zinc-500">
+              Decision Alignment
+            </p>
+
+            <p className="mt-2 text-xl font-bold text-white">
+              {signalConfidence.decisionAlignment}%
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+            <p className="text-xs text-zinc-500">
+              Risk Alignment
+            </p>
+
+            <p className="mt-2 text-xl font-bold text-white">
+              {signalConfidence.riskAlignment}%
+            </p>
+          </div>
+        </div>
+
+        {data && (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+              <p className="text-xs text-zinc-500">
+                Confidence Reason
+              </p>
+
+              <p className="mt-2 text-sm font-medium text-zinc-300">
+                {signalConfidence.reason}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+              <p className="text-xs text-zinc-500">
+                Primary Weakness
+              </p>
+
+              <p className="mt-2 text-sm font-medium text-zinc-300">
+                {signalConfidence.weakness}
+              </p>
+            </div>
           </div>
         )}
       </div>
