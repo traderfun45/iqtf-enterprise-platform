@@ -75,6 +75,80 @@ function getDecision(data: Intelligence | null) {
   }
 }
 
+function getRiskPositionContext(
+  data: Intelligence | null,
+  decision: ReturnType<typeof getDecision>
+) {
+  if (!data) {
+    return {
+      positionBias: "NEUTRAL",
+      readiness: "NOT READY",
+      riskLevel: "UNKNOWN",
+      atrContext: "—",
+      protection: "WAIT FOR LIVE DATA",
+    }
+  }
+
+  const atr = data.volatility.atr
+  const atrPercent = data.volatility.atrPercent
+
+  let positionBias = "NEUTRAL"
+
+  if (decision.bias === "BULLISH") {
+    positionBias = "LONG-SIDE"
+  } else if (decision.bias === "BEARISH") {
+    positionBias = "SHORT-SIDE"
+  }
+
+  let readiness = "NOT READY"
+
+  if (
+    decision.action !== "WAIT" &&
+    decision.confidence >= 70 &&
+    decision.risk !== "HIGH"
+  ) {
+    readiness = "CONFIRMED"
+  } else if (
+    decision.bias !== "NEUTRAL" &&
+    decision.confidence >= 50 &&
+    decision.risk !== "HIGH"
+  ) {
+    readiness = "WATCH"
+  }
+
+  let riskLevel = "NORMAL"
+
+  if (atrPercent >= 0.5) {
+    riskLevel = "HIGH"
+  } else if (atrPercent >= 0.3) {
+    riskLevel = "ELEVATED"
+  } else if (atrPercent < 0.15) {
+    riskLevel = "LOW"
+  }
+
+  const atrContext = `ATR ${atr.toFixed(2)} · ${atrPercent.toFixed(2)}%`
+
+  let protection = "Monitor confirmation before directional exposure"
+
+  if (riskLevel === "HIGH") {
+    protection = "High-volatility protection active"
+  } else if (readiness === "NOT READY") {
+    protection = "Insufficient confirmation · WAIT"
+  } else if (readiness === "WATCH") {
+    protection = "Monitor confirmation and volatility"
+  } else {
+    protection = "Conditions remain within defined risk limits"
+  }
+
+  return {
+    positionBias,
+    readiness,
+    riskLevel,
+    atrContext,
+    protection,
+  }
+}
+
 export default function AIAnalysisPage() {
   const [data, setData] = useState<Intelligence | null>(null)
   const [loading, setLoading] = useState(true)
@@ -158,6 +232,15 @@ export default function AIAnalysisPage() {
         : decision.risk === "LOW"
           ? "text-emerald-400"
           : "text-zinc-300"
+
+  const riskPosition = getRiskPositionContext(data, decision)
+
+  const readinessColor =
+    riskPosition.readiness === "CONFIRMED"
+      ? "text-emerald-400"
+      : riskPosition.readiness === "WATCH"
+        ? "text-yellow-400"
+        : "text-zinc-300"
 
   return (
     <div className="space-y-6 p-6">
@@ -489,6 +572,77 @@ export default function AIAnalysisPage() {
             {decision.action === "WAIT"
               ? "Current trend and score do not provide sufficient confirmation for an aggressive directional decision."
               : `Current intelligence supports a ${decision.action.toLowerCase()} with ${decision.risk.toLowerCase()} risk conditions.`}
+          </div>
+        )}
+      </div>
+
+      {/* Executive Risk & Position Context */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="text-sky-400" />
+
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Executive Risk & Position
+            </h2>
+
+            <p className="text-xs text-zinc-500">
+              Risk context derived from live intelligence and decision state
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Position Bias
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${decisionColor}`}>
+              {riskPosition.positionBias}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Entry Readiness
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${readinessColor}`}>
+              {riskPosition.readiness}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Risk Level
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${riskColor}`}>
+              {riskPosition.riskLevel}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Volatility Context
+            </p>
+
+            <p className="mt-2 text-xl font-bold text-white">
+              {riskPosition.atrContext}
+            </p>
+          </div>
+        </div>
+
+        {data && (
+          <div className="mt-4 rounded-lg border border-white/5 bg-white/[0.02] p-4">
+            <p className="text-xs text-zinc-500">
+              Risk Protection
+            </p>
+
+            <p className="mt-2 text-sm font-medium text-zinc-300">
+              {riskPosition.protection}
+            </p>
           </div>
         )}
       </div>
