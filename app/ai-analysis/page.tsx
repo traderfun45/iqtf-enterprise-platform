@@ -24,6 +24,57 @@ function formatPercent(value: number) {
   return `${value.toFixed(2)}%`
 }
 
+function getDecision(data: Intelligence | null) {
+  if (!data) {
+    return {
+      bias: "NEUTRAL",
+      confidence: 0,
+      risk: "UNKNOWN",
+      action: "WAIT",
+    }
+  }
+
+  const absScore = Math.abs(data.score)
+  const confidence = Math.min(100, Math.round(absScore * 1000))
+
+  let bias = "NEUTRAL"
+
+  if (data.signal === "bullish") {
+    bias = "BULLISH"
+  } else if (data.signal === "bearish") {
+    bias = "BEARISH"
+  } else if (data.trend.direction === "bullish" && data.score > 0) {
+    bias = "BULLISH"
+  } else if (data.trend.direction === "bearish" && data.score < 0) {
+    bias = "BEARISH"
+  }
+
+  let risk = "NORMAL"
+
+  if (data.volatility.atrPercent >= 0.5) {
+    risk = "HIGH"
+  } else if (data.volatility.atrPercent >= 0.3) {
+    risk = "ELEVATED"
+  } else if (data.volatility.atrPercent < 0.15) {
+    risk = "LOW"
+  }
+
+  let action = "WAIT"
+
+  if (data.signal === "bullish" && data.score >= 0.1) {
+    action = "LONG BIAS"
+  } else if (data.signal === "bearish" && data.score <= -0.1) {
+    action = "SHORT BIAS"
+  }
+
+  return {
+    bias,
+    confidence,
+    risk,
+    action,
+  }
+}
+
 export default function AIAnalysisPage() {
   const [data, setData] = useState<Intelligence | null>(null)
   const [loading, setLoading] = useState(true)
@@ -89,6 +140,24 @@ export default function AIAnalysisPage() {
     : isBearish
       ? "bg-red-500/10"
       : "bg-zinc-500/10"
+
+  const decision = getDecision(data)
+
+  const decisionColor =
+    decision.bias === "BULLISH"
+      ? "text-emerald-400"
+      : decision.bias === "BEARISH"
+        ? "text-red-400"
+        : "text-zinc-300"
+
+  const riskColor =
+    decision.risk === "HIGH"
+      ? "text-red-400"
+      : decision.risk === "ELEVATED"
+        ? "text-yellow-400"
+        : decision.risk === "LOW"
+          ? "text-emerald-400"
+          : "text-zinc-300"
 
   return (
     <div className="space-y-6 p-6">
@@ -352,6 +421,76 @@ export default function AIAnalysisPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Executive Decision Layer */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="text-sky-400" />
+
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Executive Decision
+            </h2>
+
+            <p className="text-xs text-zinc-500">
+              Decision layer derived from live intelligence
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-4">
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Market Bias
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${decisionColor}`}>
+              {decision.bias}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Confidence
+            </p>
+
+            <p className="mt-2 text-xl font-bold text-white">
+              {data ? `${decision.confidence}%` : "—"}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Risk State
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${riskColor}`}>
+              {decision.risk}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Executive Action
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${decisionColor}`}>
+              {decision.action}
+            </p>
+          </div>
+        </div>
+
+        {data && (
+          <div className="mt-4 rounded-lg border border-white/5 bg-white/[0.02] p-4 text-sm text-zinc-400">
+            <span className="font-semibold text-white">
+              Decision rationale:
+            </span>{" "}
+            {decision.action === "WAIT"
+              ? "Current trend and score do not provide sufficient confirmation for an aggressive directional decision."
+              : `Current intelligence supports a ${decision.action.toLowerCase()} with ${decision.risk.toLowerCase()} risk conditions.`}
+          </div>
+        )}
       </div>
 
       {/* Executive Interpretation */}
