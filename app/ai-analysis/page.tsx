@@ -327,6 +327,87 @@ function getMonitoringContext(
   }
 }
 
+function getAlertContext(
+  data: Intelligence | null,
+  decision: ReturnType<typeof getDecision>,
+  riskPosition: ReturnType<typeof getRiskPositionContext>,
+  tradePlan: ReturnType<typeof getTradePlan>,
+  monitoring: ReturnType<typeof getMonitoringContext>
+) {
+  if (!data) {
+    return {
+      level: "LOW",
+      primary: "DATA UNAVAILABLE",
+      escalation: "NONE",
+      reason: "Live intelligence data is required",
+      action: "WAIT FOR LIVE DATA",
+    }
+  }
+
+  const atrPercent = data.volatility.atrPercent
+  const trendScore = data.trend.score
+  const momentumScore = data.momentum.score
+
+  const divergence =
+    (data.trend.direction === "bullish" && momentumScore < 0) ||
+    (data.trend.direction === "bearish" && momentumScore > 0)
+
+  let level = "NORMAL"
+  let primary = "NO ACTIVE ALERT"
+  let escalation = "NONE"
+  let reason = "Current market state remains within defined monitoring limits"
+  let action = "CONTINUE MONITORING"
+
+  if (atrPercent >= 0.5) {
+    level = "HIGH"
+    primary = "HIGH VOLATILITY"
+    escalation = "RISK ESCALATION"
+    reason = "Volatility has exceeded the defined high-risk threshold"
+    action = "REDUCE EXPOSURE AND WAIT FOR STABILITY"
+  } else if (
+    riskPosition.readiness === "CONFIRMED" &&
+    decision.risk === "HIGH"
+  ) {
+    level = "HIGH"
+    primary = "CONFIRMED SETUP / HIGH RISK"
+    escalation = "RISK ESCALATION"
+    reason = "Directional confirmation exists while risk remains elevated"
+    action = "REQUIRE STRICT RISK CONTROL"
+  } else if (divergence) {
+    level = "MEDIUM"
+    primary = "TREND / MOMENTUM DIVERGENCE"
+    escalation = "CONFIRMATION ESCALATION"
+    reason = "Trend direction and momentum are not aligned"
+    action = "WAIT FOR MOMENTUM CONFIRMATION"
+  } else if (
+    monitoring.confirmation === "DEVELOPING" ||
+    monitoring.priority === "MEDIUM"
+  ) {
+    level = "MEDIUM"
+    primary = "DEVELOPING SCENARIO"
+    escalation = "MONITOR CLOSELY"
+    reason = "Directional conditions are developing but remain unconfirmed"
+    action = "MONITOR FOR CONFIRMATION"
+  } else if (
+    Math.abs(trendScore) >= 0.1 ||
+    monitoring.regime === "TRENDING"
+  ) {
+    level = "LOW"
+    primary = "TREND ACTIVE"
+    escalation = "ROUTINE MONITORING"
+    reason = "A directional trend is active without elevated risk conditions"
+    action = "CONTINUE MONITORING"
+  }
+
+  return {
+    level,
+    primary,
+    escalation,
+    reason,
+    action,
+  }
+}
+
 export default function AIAnalysisPage() {
   const [data, setData] = useState<Intelligence | null>(null)
   const [loading, setLoading] = useState(true)
@@ -453,6 +534,23 @@ export default function AIAnalysisPage() {
       : monitoring.priority === "MEDIUM"
         ? "text-yellow-400"
         : "text-zinc-300"
+
+  const alert = getAlertContext(
+    data,
+    decision,
+    riskPosition,
+    tradePlan,
+    monitoring
+  )
+
+  const alertColor =
+    alert.level === "HIGH"
+      ? "text-red-400"
+      : alert.level === "MEDIUM"
+        ? "text-yellow-400"
+        : alert.level === "LOW"
+          ? "text-sky-400"
+          : "text-emerald-400"
 
   return (
     <div className="space-y-6 p-6">
@@ -1039,6 +1137,77 @@ export default function AIAnalysisPage() {
                 {monitoring.invalidation}
               </p>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Executive Alert & Escalation Layer */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="text-sky-400" />
+
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Executive Alert & Escalation
+            </h2>
+
+            <p className="text-xs text-zinc-500">
+              Alert state derived from live risk, confirmation and scenario conditions
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Alert Level
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${alertColor}`}>
+              {alert.level}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Primary Alert
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${alertColor}`}>
+              {alert.primary}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Escalation
+            </p>
+
+            <p className="mt-2 text-xl font-bold text-white">
+              {alert.escalation}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Required Action
+            </p>
+
+            <p className="mt-2 text-sm font-bold text-zinc-300">
+              {alert.action}
+            </p>
+          </div>
+        </div>
+
+        {data && (
+          <div className="mt-4 rounded-lg border border-white/5 bg-white/[0.02] p-4">
+            <p className="text-xs text-zinc-500">
+              Alert Reason
+            </p>
+
+            <p className="mt-2 text-sm font-medium text-zinc-300">
+              {alert.reason}
+            </p>
           </div>
         )}
       </div>
