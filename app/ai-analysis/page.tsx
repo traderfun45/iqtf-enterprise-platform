@@ -218,6 +218,115 @@ function getTradePlan(
   }
 }
 
+function getMonitoringContext(
+  data: Intelligence | null,
+  decision: ReturnType<typeof getDecision>,
+  riskPosition: ReturnType<typeof getRiskPositionContext>,
+  tradePlan: ReturnType<typeof getTradePlan>
+) {
+  if (!data) {
+    return {
+      regime: "UNKNOWN",
+      scenario: "NEUTRAL",
+      confirmation: "WAITING",
+      priority: "LOW",
+      watch: "WAIT FOR LIVE DATA",
+      invalidation: "LIVE DATA REQUIRED",
+    }
+  }
+
+  const trendScore = data.trend.score
+  const momentumScore = data.momentum.score
+  const atrPercent = data.volatility.atrPercent
+
+  let regime = "RANGE"
+
+  if (atrPercent >= 0.5) {
+    regime = "HIGH VOLATILITY"
+  } else if (atrPercent < 0.15) {
+    regime = "LOW VOLATILITY"
+  } else if (Math.abs(trendScore) >= 0.1) {
+    regime = "TRENDING"
+  }
+
+  let scenario = "NEUTRAL"
+
+  if (
+    data.trend.direction === "bullish" &&
+    trendScore > 0 &&
+    momentumScore > 0
+  ) {
+    scenario = "BULLISH"
+  } else if (
+    data.trend.direction === "bearish" &&
+    trendScore < 0 &&
+    momentumScore < 0
+  ) {
+    scenario = "BEARISH"
+  }
+
+  let confirmation = "WAITING"
+
+  if (
+    decision.action !== "WAIT" &&
+    riskPosition.readiness === "CONFIRMED"
+  ) {
+    confirmation = "CONFIRMED"
+  } else if (
+    scenario !== "NEUTRAL" ||
+    riskPosition.readiness === "WATCH"
+  ) {
+    confirmation = "DEVELOPING"
+  }
+
+  let priority = "LOW"
+
+  if (
+    confirmation === "CONFIRMED" ||
+    regime === "HIGH VOLATILITY"
+  ) {
+    priority = "HIGH"
+  } else if (
+    confirmation === "DEVELOPING" ||
+    regime === "TRENDING"
+  ) {
+    priority = "MEDIUM"
+  }
+
+  let watch = "Monitor trend and momentum alignment"
+
+  if (scenario === "BULLISH") {
+    watch = "Monitor bullish continuation and momentum confirmation"
+  } else if (scenario === "BEARISH") {
+    watch = "Monitor bearish continuation and momentum confirmation"
+  } else if (data.trend.direction === "bullish") {
+    watch = "Bullish trend remains active, but momentum confirmation is required"
+  } else if (data.trend.direction === "bearish") {
+    watch = "Bearish trend remains active, but momentum confirmation is required"
+  }
+
+  let invalidation = "No directional confirmation yet"
+
+  if (tradePlan.direction === "LONG") {
+    invalidation = "Cancel long scenario if bullish structure fails"
+  } else if (tradePlan.direction === "SHORT") {
+    invalidation = "Cancel short scenario if bearish structure fails"
+  } else if (scenario === "BULLISH") {
+    invalidation = "Bullish scenario weakens if trend and momentum diverge"
+  } else if (scenario === "BEARISH") {
+    invalidation = "Bearish scenario weakens if trend and momentum diverge"
+  }
+
+  return {
+    regime,
+    scenario,
+    confirmation,
+    priority,
+    watch,
+    invalidation,
+  }
+}
+
 export default function AIAnalysisPage() {
   const [data, setData] = useState<Intelligence | null>(null)
   const [loading, setLoading] = useState(true)
@@ -322,6 +431,27 @@ export default function AIAnalysisPage() {
       ? "text-emerald-400"
       : tradePlan.direction === "SHORT"
         ? "text-red-400"
+        : "text-zinc-300"
+
+  const monitoring = getMonitoringContext(
+    data,
+    decision,
+    riskPosition,
+    tradePlan
+  )
+
+  const monitoringColor =
+    monitoring.scenario === "BULLISH"
+      ? "text-emerald-400"
+      : monitoring.scenario === "BEARISH"
+        ? "text-red-400"
+        : "text-zinc-300"
+
+  const priorityColor =
+    monitoring.priority === "HIGH"
+      ? "text-red-400"
+      : monitoring.priority === "MEDIUM"
+        ? "text-yellow-400"
         : "text-zinc-300"
 
   return (
@@ -826,6 +956,89 @@ export default function AIAnalysisPage() {
             </span>{" "}
             The plan remains conditional and follows the current
             intelligence, confirmation state, and volatility regime.
+          </div>
+        )}
+      </div>
+
+      {/* Executive Monitoring & Scenario Layer */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="text-sky-400" />
+
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Executive Monitoring & Scenario
+            </h2>
+
+            <p className="text-xs text-zinc-500">
+              Live monitoring state derived from trend, momentum and volatility
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Market Regime
+            </p>
+
+            <p className="mt-2 text-xl font-bold text-white">
+              {monitoring.regime}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Active Scenario
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${monitoringColor}`}>
+              {monitoring.scenario}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Confirmation
+            </p>
+
+            <p className="mt-2 text-xl font-bold text-white">
+              {monitoring.confirmation}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Monitoring Priority
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${priorityColor}`}>
+              {monitoring.priority}
+            </p>
+          </div>
+        </div>
+
+        {data && (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+              <p className="text-xs text-zinc-500">
+                What to Monitor
+              </p>
+
+              <p className="mt-2 text-sm font-medium text-zinc-300">
+                {monitoring.watch}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+              <p className="text-xs text-zinc-500">
+                Scenario Invalidation
+              </p>
+
+              <p className="mt-2 text-sm font-medium text-zinc-300">
+                {monitoring.invalidation}
+              </p>
+            </div>
           </div>
         )}
       </div>
