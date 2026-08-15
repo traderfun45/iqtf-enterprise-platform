@@ -408,6 +408,97 @@ function getAlertContext(
   }
 }
 
+function getActionContext(
+  data: Intelligence | null,
+  decision: ReturnType<typeof getDecision>,
+  riskPosition: ReturnType<typeof getRiskPositionContext>,
+  tradePlan: ReturnType<typeof getTradePlan>,
+  monitoring: ReturnType<typeof getMonitoringContext>,
+  alert: ReturnType<typeof getAlertContext>
+) {
+  if (!data) {
+    return {
+      action: "WAIT",
+      state: "DATA REQUIRED",
+      priority: "LOW",
+      nextStep: "Wait for live intelligence data",
+      constraint: "No execution without live data",
+    }
+  }
+
+  let action = "WAIT"
+  let state = "OBSERVE"
+  let priority = "LOW"
+  let nextStep = "Continue monitoring current market state"
+  let constraint = "No execution without confirmation"
+
+  if (alert.level === "HIGH") {
+    action = "PROTECT"
+    state = "RISK CONTROL"
+    priority = "HIGH"
+    nextStep = alert.action
+    constraint = "Do not initiate new exposure while risk is elevated"
+  } else if (
+    tradePlan.direction === "LONG" &&
+    tradePlan.planStatus === "READY"
+  ) {
+    action = "PREPARE LONG"
+    state = "EXECUTION READY"
+    priority = "HIGH"
+    nextStep = "Wait for the defined long trigger before execution"
+    constraint = "Execute only after trigger confirmation"
+  } else if (
+    tradePlan.direction === "SHORT" &&
+    tradePlan.planStatus === "READY"
+  ) {
+    action = "PREPARE SHORT"
+    state = "EXECUTION READY"
+    priority = "HIGH"
+    nextStep = "Wait for the defined short trigger before execution"
+    constraint = "Execute only after trigger confirmation"
+  } else if (
+    monitoring.confirmation === "DEVELOPING"
+  ) {
+    action = "WAIT FOR CONFIRMATION"
+    state = "DEVELOPING"
+    priority = "MEDIUM"
+    nextStep = monitoring.watch
+    constraint = "Do not execute while directional confirmation is incomplete"
+  } else if (
+    monitoring.scenario === "BULLISH"
+  ) {
+    action = "WATCH LONG"
+    state = "WATCH"
+    priority = "MEDIUM"
+    nextStep = "Monitor bullish continuation and momentum confirmation"
+    constraint = "No long execution without confirmation"
+  } else if (
+    monitoring.scenario === "BEARISH"
+  ) {
+    action = "WATCH SHORT"
+    state = "WATCH"
+    priority = "MEDIUM"
+    nextStep = "Monitor bearish continuation and momentum confirmation"
+    constraint = "No short execution without confirmation"
+  } else if (
+    decision.action !== "WAIT"
+  ) {
+    action = "MONITOR BIAS"
+    state = "BIAS ACTIVE"
+    priority = "LOW"
+    nextStep = "Monitor for alignment between decision and market confirmation"
+    constraint = "Maintain conditional execution only"
+  }
+
+  return {
+    action,
+    state,
+    priority,
+    nextStep,
+    constraint,
+  }
+}
+
 export default function AIAnalysisPage() {
   const [data, setData] = useState<Intelligence | null>(null)
   const [loading, setLoading] = useState(true)
@@ -551,6 +642,22 @@ export default function AIAnalysisPage() {
         : alert.level === "LOW"
           ? "text-sky-400"
           : "text-emerald-400"
+
+  const actionContext = getActionContext(
+    data,
+    decision,
+    riskPosition,
+    tradePlan,
+    monitoring,
+    alert
+  )
+
+  const actionColor =
+    actionContext.priority === "HIGH"
+      ? "text-red-400"
+      : actionContext.priority === "MEDIUM"
+        ? "text-yellow-400"
+        : "text-sky-400"
 
   return (
     <div className="space-y-6 p-6">
@@ -1210,6 +1317,97 @@ export default function AIAnalysisPage() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Executive Action & Execution Layer */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="text-sky-400" />
+
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Executive Action & Execution
+            </h2>
+
+            <p className="text-xs text-zinc-500">
+              Action state derived from decision, risk, plan, monitoring and alerts
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Recommended Action
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${actionColor}`}>
+              {actionContext.action}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Execution State
+            </p>
+
+            <p className="mt-2 text-xl font-bold text-white">
+              {actionContext.state}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Action Priority
+            </p>
+
+            <p className={`mt-2 text-xl font-bold ${actionColor}`}>
+              {actionContext.priority}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">
+              Execution Gate
+            </p>
+
+            <p className="mt-2 text-sm font-bold text-zinc-300">
+              Conditional
+            </p>
+          </div>
+        </div>
+
+        {data && (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+              <p className="text-xs text-zinc-500">
+                Next Step
+              </p>
+
+              <p className="mt-2 text-sm font-medium text-zinc-300">
+                {actionContext.nextStep}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+              <p className="text-xs text-zinc-500">
+                Execution Constraint
+              </p>
+
+              <p className="mt-2 text-sm font-medium text-zinc-300">
+                {actionContext.constraint}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 rounded-lg border border-sky-500/10 bg-sky-500/[0.03] p-4 text-sm text-zinc-400">
+          <span className="font-semibold text-white">
+            Execution policy:
+          </span>{" "}
+          Actions remain conditional on live market confirmation and risk
+          controls. No automatic order execution is implied by this layer.
+        </div>
       </div>
 
       {/* Executive Interpretation */}
