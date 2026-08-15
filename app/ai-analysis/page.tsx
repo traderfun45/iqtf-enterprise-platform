@@ -13,7 +13,9 @@ import {
 
 import {
   getMarketIntelligence,
+  getMarketSnapshot,
   type Intelligence,
+  type Quote,
 } from "@/lib/market"
 
 function formatScore(value: number) {
@@ -22,6 +24,13 @@ function formatScore(value: number) {
 
 function formatPercent(value: number) {
   return `${value.toFixed(2)}%`
+}
+
+function formatPrice(value: number) {
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 function getDecision(data: Intelligence | null) {
@@ -712,6 +721,7 @@ export default function AIAnalysisPage() {
 
 
   const [data, setData] = useState<Intelligence | null>(null)
+  const [xauQuote, setXauQuote] = useState<Quote | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -726,13 +736,21 @@ export default function AIAnalysisPage() {
 
       setError(null)
 
-      const result = await getMarketIntelligence(
-        "XAUUSD",
-        "1h",
-        50
+      const [result, snapshot] = await Promise.all([
+        getMarketIntelligence("XAUUSD", "1h", 50),
+        getMarketSnapshot(),
+      ])
+
+      const xau = snapshot.data.find(
+        (item) => item.symbol === "XAUUSD"
       )
 
+      if (!xau) {
+        throw new Error("XAUUSD market price unavailable")
+      }
+
       setData(result)
+      setXauQuote(xau)
     } catch (err) {
       setError(
         err instanceof Error
@@ -962,7 +980,21 @@ export default function AIAnalysisPage() {
       )}
 
       {/* Executive Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="rounded-xl border border-emerald-500/20 bg-zinc-950 p-5">
+          <p className="text-sm text-zinc-500">
+            XAUUSD Live Price
+          </p>
+
+          <p className="mt-2 text-2xl font-bold tracking-tight text-white">
+            {xauQuote ? formatPrice(xauQuote.price) : "—"}
+          </p>
+
+          <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            {xauQuote?.source ?? "Market feed"}
+          </div>
+        </div>
         <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5">
           <p className="text-sm text-zinc-500">
             Market Regime
