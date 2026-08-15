@@ -15,18 +15,51 @@ export type MarketSnapshot = {
 
 export type Intelligence = {
   symbol: string
+
   trend: {
     direction: "bullish" | "bearish" | "neutral"
     score: number
   }
+
   volatility: {
     atr: number
     atrPercent: number
   }
+
+  volatilityRegime: {
+    regime: "LOW" | "NORMAL" | "HIGH"
+    score: number
+    atrPercent: number
+  }
+
   momentum: {
     value: number
     score: number
   }
+
+  structure: {
+    direction: "bullish" | "bearish" | "neutral"
+    score: number
+    higherHigh: boolean
+    higherLow: boolean
+    lowerHigh: boolean
+    lowerLow: boolean
+    bias: "bullish" | "bearish" | "neutral"
+  }
+
+  mtf: {
+    shortTerm: {
+      direction: "bullish" | "bearish" | "neutral"
+      score: number
+    }
+    mediumTerm: {
+      direction: "bullish" | "bearish" | "neutral"
+      score: number
+    }
+    alignment: "bullish" | "bearish" | "neutral"
+    score: number
+  }
+
   score: number
   signal: "bullish" | "bearish" | "neutral"
   timestamp: string

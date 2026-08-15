@@ -13,7 +13,12 @@ export type FactorStatus =
 export type IntelligenceFactor = {
   id: string
   name: string
-  category: "trend" | "momentum" | "structure" | "volatility" | "mtf"
+  category:
+    | "trend"
+    | "momentum"
+    | "structure"
+    | "volatility"
+    | "mtf"
   score: number
   weight: number
   contribution: number
@@ -31,11 +36,17 @@ export type FactorAnalysis = {
   confidence: number
 }
 
-function clamp(value: number, min: number, max: number) {
+function clamp(
+  value: number,
+  min: number,
+  max: number
+) {
   return Math.max(min, Math.min(max, value))
 }
 
-function directionFromScore(score: number): FactorDirection {
+function directionFromScore(
+  score: number
+): FactorDirection {
   if (score > 0.05) return "bullish"
   if (score < -0.05) return "bearish"
   return "neutral"
@@ -53,37 +64,66 @@ function statusFromScore(
     (score > 0 && signalScore > 0) ||
     (score < 0 && signalScore < 0)
 
-  return sameDirection ? "supporting" : "conflicting"
+  return sameDirection
+    ? "supporting"
+    : "conflicting"
 }
 
 export function buildIntelligenceFactors(
   data: Intelligence
 ): FactorAnalysis {
-  const signalScore = data.score
+  const signalScore = clamp(data.score, -1, 1)
 
-  const trendScore = clamp(data.trend.score, -1, 1)
-  const momentumScore = clamp(data.momentum.score, -1, 1)
+  const trendScore = clamp(
+    data.trend.score,
+    -1,
+    1
+  )
+
+  const momentumScore = clamp(
+    data.momentum.score,
+    -1,
+    1
+  )
+
+  const structureScore = clamp(
+    data.structure.score,
+    -1,
+    1
+  )
+
+  const mtfScore = clamp(
+    data.mtf.score,
+    -1,
+    1
+  )
 
   /*
-   * Volatility is treated as a risk/context factor.
-   * Higher ATR does not automatically mean bullish or bearish.
-   * Therefore it only becomes conflicting when volatility is
-   * elevated enough to reduce directional confidence.
+   * Volatility regime is a context factor.
+   *
+   * LOW / NORMAL:
+   * no directional pressure.
+   *
+   * HIGH:
+   * reduces directional confidence rather than
+   * automatically becoming bullish or bearish.
    */
-  let volatilityScore = 0
+  let volatilityScore = clamp(
+    data.volatilityRegime.score,
+    -1,
+    1
+  )
 
-  if (data.volatility.atrPercent >= 0.5) {
-    volatilityScore = signalScore === 0
-      ? 0
-      : signalScore > 0
-        ? -0.8
-        : 0.8
-  } else if (data.volatility.atrPercent >= 0.3) {
-    volatilityScore = signalScore === 0
-      ? 0
-      : signalScore > 0
-        ? -0.4
-        : 0.4
+  if (
+    data.volatilityRegime.regime === "HIGH" &&
+    volatilityScore === 0
+  ) {
+    volatilityScore =
+      signalScore > 0
+        ? -0.5
+        : signalScore < 0
+          ? 0.5
+          : 0
   }
 
   const factors: IntelligenceFactor[] = [
@@ -92,26 +132,35 @@ export function buildIntelligenceFactors(
       name: "Trend",
       category: "trend",
       score: trendScore,
-      weight: 0.30,
-      contribution: trendScore * 0.30,
+      weight: 0.25,
+      contribution: trendScore * 0.25,
       direction: directionFromScore(trendScore),
-      status: statusFromScore(trendScore, signalScore),
+      status: statusFromScore(
+        trendScore,
+        signalScore
+      ),
       reason:
         data.trend.direction === "bullish"
-          ? "Trend structure is bullish"
+          ? "Trend direction is bullish"
           : data.trend.direction === "bearish"
-            ? "Trend structure is bearish"
+            ? "Trend direction is bearish"
             : "Trend direction is neutral",
     },
+
     {
       id: "momentum",
       name: "Momentum",
       category: "momentum",
       score: momentumScore,
-      weight: 0.25,
-      contribution: momentumScore * 0.25,
-      direction: directionFromScore(momentumScore),
-      status: statusFromScore(momentumScore, signalScore),
+      weight: 0.20,
+      contribution: momentumScore * 0.20,
+      direction: directionFromScore(
+        momentumScore
+      ),
+      status: statusFromScore(
+        momentumScore,
+        signalScore
+      ),
       reason:
         momentumScore > 0.05
           ? "Momentum supports upside continuation"
@@ -119,84 +168,111 @@ export function buildIntelligenceFactors(
             ? "Momentum supports downside continuation"
             : "Momentum confirmation is weak",
     },
+
     {
       id: "structure",
       name: "Structure",
       category: "structure",
-      score: trendScore,
-      weight: 0.20,
-      contribution: trendScore * 0.20,
-      direction: directionFromScore(trendScore),
-      status: statusFromScore(trendScore, signalScore),
+      score: structureScore,
+      weight: 0.25,
+      contribution: structureScore * 0.25,
+      direction: directionFromScore(
+        structureScore
+      ),
+      status: statusFromScore(
+        structureScore,
+        signalScore
+      ),
       reason:
-        trendScore > 0.05
-          ? "Market structure currently favors buyers"
-          : trendScore < -0.05
-            ? "Market structure currently favors sellers"
+        data.structure.bias === "bullish"
+          ? "Market structure favors buyers"
+          : data.structure.bias === "bearish"
+            ? "Market structure favors sellers"
             : "Market structure has no clear directional edge",
     },
+
     {
       id: "volatility",
-      name: "Volatility",
+      name: "Volatility Regime",
       category: "volatility",
       score: volatilityScore,
-      weight: 0.15,
-      contribution: volatilityScore * 0.15,
-      direction: directionFromScore(volatilityScore),
-      status: statusFromScore(volatilityScore, signalScore),
+      weight: 0.10,
+      contribution: volatilityScore * 0.10,
+      direction: directionFromScore(
+        volatilityScore
+      ),
+      status:
+        data.volatilityRegime.regime === "HIGH"
+          ? "conflicting"
+          : "neutral",
       reason:
-        data.volatility.atrPercent >= 0.5
+        data.volatilityRegime.regime === "HIGH"
           ? "High volatility is reducing directional confidence"
-          : data.volatility.atrPercent >= 0.3
-            ? "Elevated volatility requires additional confirmation"
-            : "Volatility remains within normal conditions",
+          : data.volatilityRegime.regime === "LOW"
+            ? "Low volatility indicates compressed market conditions"
+            : "Volatility regime is normal",
     },
+
     {
       id: "mtf",
       name: "Multi-Timeframe",
       category: "mtf",
-      score: signalScore,
-      weight: 0.10,
-      contribution: signalScore * 0.10,
-      direction: directionFromScore(signalScore),
-      status: signalScore === 0 ? "neutral" : "supporting",
+      score: mtfScore,
+      weight: 0.20,
+      contribution: mtfScore * 0.20,
+      direction: directionFromScore(mtfScore),
+      status:
+        Math.abs(mtfScore) < 0.05
+          ? "neutral"
+          : statusFromScore(
+              mtfScore,
+              signalScore
+            ),
       reason:
-        data.signal === "bullish"
-          ? "Current intelligence signal favors bullish conditions"
-          : data.signal === "bearish"
-            ? "Current intelligence signal favors bearish conditions"
-            : "Multi-timeframe directional confirmation is neutral",
+        data.mtf.alignment === "bullish"
+          ? "Short-term and medium-term structure align bullish"
+          : data.mtf.alignment === "bearish"
+            ? "Short-term and medium-term structure align bearish"
+            : "Multi-timeframe structure is not aligned",
     },
   ]
 
   const supporting = factors.filter(
-    (factor) => factor.status === "supporting"
+    (factor) =>
+      factor.status === "supporting"
   )
 
   const conflicting = factors.filter(
-    (factor) => factor.status === "conflicting"
+    (factor) =>
+      factor.status === "conflicting"
   )
 
   const neutral = factors.filter(
-    (factor) => factor.status === "neutral"
+    (factor) =>
+      factor.status === "neutral"
   )
 
   const primaryDriver =
     factors
-      .filter((factor) => factor.status === "supporting")
+      .filter(
+        (factor) =>
+          factor.status === "supporting"
+      )
       .sort(
         (a, b) =>
-          Math.abs(b.contribution) - Math.abs(a.contribution)
+          Math.abs(b.contribution) -
+          Math.abs(a.contribution)
       )[0] ?? null
+
+  const weightedScore = factors.reduce(
+    (total, factor) =>
+      total + factor.contribution,
+    0
+  )
 
   const confidence = Math.round(
     clamp(
-      Math.abs(
-        factors.reduce(
-          (total, factor) => total + factor.contribution,
-          0
-        )
-      ) * 100,
+      Math.abs(weightedScore) * 100,
       0,
       100
     )
