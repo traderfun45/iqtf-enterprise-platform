@@ -969,6 +969,86 @@ export default function AIAnalysisPage() {
         </button>
       </div>
 
+      {/* EXECUTIVE MARKET CONTEXT */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+
+          {/* Live Price */}
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              XAUUSD
+            </span>
+            <span className="text-sm font-bold text-white">
+              {xauQuote ? formatPrice(xauQuote.price) : "—"}
+            </span>
+          </div>
+
+          <div className="hidden h-4 w-px bg-zinc-800 sm:block" />
+
+          {/* Trend */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wide text-zinc-500">
+              Trend
+            </span>
+            <span className="text-xs font-semibold uppercase ${signalColor}">
+              {data?.trend.direction ?? "—"}
+            </span>
+          </div>
+
+          <div className="hidden h-4 w-px bg-zinc-800 sm:block" />
+
+          {/* Signal */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wide text-zinc-500">
+              Signal
+            </span>
+            <span className="text-xs font-semibold uppercase ${signalColor}">
+              {data?.signal ?? "—"}
+            </span>
+          </div>
+
+          <div className="hidden h-4 w-px bg-zinc-800 sm:block" />
+
+          {/* Volatility */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wide text-zinc-500">
+              Volatility
+            </span>
+            <span className="text-xs font-semibold text-zinc-200">
+              {data?.volatilityRegime.regime ?? "—"}
+            </span>
+          </div>
+
+          <div className="hidden h-4 w-px bg-zinc-800 sm:block" />
+
+          {/* MTF */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wide text-zinc-500">
+              MTF
+            </span>
+            <span className="text-xs font-semibold uppercase text-sky-400">
+              {data?.mtf.alignment ?? "—"}
+            </span>
+          </div>
+
+          <div className="hidden h-4 w-px bg-zinc-800 sm:block" />
+
+          {/* Last Update */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wide text-zinc-500">
+              Updated
+            </span>
+            <span className="text-xs text-zinc-400">
+              {xauQuote
+                ? new Date(xauQuote.timestamp).toLocaleTimeString()
+                : "—"}
+            </span>
+          </div>
+
+        </div>
+      </div>
+
       {/* Error */}
       {error && (
         <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
