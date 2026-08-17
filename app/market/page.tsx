@@ -360,6 +360,138 @@ export default function MarketPage() {
           </CardContent>
         </Card>
 
+
+        {/* Intelligence V2 */}
+        <Card className="border-white/10 bg-white/[0.03]">
+          <CardHeader>
+            <CardTitle className="text-base text-white">
+              Intelligence V2
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+
+              {/* Volatility Regime */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Volatility Regime
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-lg font-semibold text-white">
+                    {intelligence?.volatilityRegime.regime ?? "—"}
+                  </span>
+
+                  <span className="text-xs text-zinc-500">
+                    Score{" "}
+                    {intelligence
+                      ? formatScore(intelligence.volatilityRegime.score)
+                      : "—"}
+                  </span>
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  ATR{" "}
+                  {intelligence
+                    ? `${intelligence.volatilityRegime.atrPercent.toFixed(3)}%`
+                    : "—"}
+                </div>
+              </div>
+
+              {/* Market Structure */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Market Structure
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-lg font-semibold text-white">
+                    {intelligence?.structure.direction ?? "—"}
+                  </span>
+
+                  <span className="text-xs text-zinc-500">
+                    Score{" "}
+                    {intelligence
+                      ? formatScore(intelligence.structure.score)
+                      : "—"}
+                  </span>
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Bias: {intelligence?.structure.bias ?? "—"}
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <span className="text-zinc-400">
+                    HH: {intelligence?.structure.higherHigh ? "Yes" : "No"}
+                  </span>
+                  <span className="text-zinc-400">
+                    HL: {intelligence?.structure.higherLow ? "Yes" : "No"}
+                  </span>
+                  <span className="text-zinc-400">
+                    LH: {intelligence?.structure.lowerHigh ? "Yes" : "No"}
+                  </span>
+                  <span className="text-zinc-400">
+                    LL: {intelligence?.structure.lowerLow ? "Yes" : "No"}
+                  </span>
+                </div>
+              </div>
+
+              {/* MTF Alignment */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  MTF Alignment
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-lg font-semibold text-white">
+                    {intelligence?.mtf.alignment ?? "—"}
+                  </span>
+
+                  <span className="text-xs text-zinc-500">
+                    Score{" "}
+                    {intelligence
+                      ? formatScore(intelligence.mtf.score)
+                      : "—"}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-[11px] text-zinc-600">
+                      Short Term
+                    </div>
+                    <div className="mt-1 text-sm font-medium text-white">
+                      {intelligence?.mtf.shortTerm.direction ?? "—"}
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      {intelligence
+                        ? formatScore(intelligence.mtf.shortTerm.score)
+                        : "—"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] text-zinc-600">
+                      Medium Term
+                    </div>
+                    <div className="mt-1 text-sm font-medium text-white">
+                      {intelligence?.mtf.mediumTerm.direction ?? "—"}
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      {intelligence
+                        ? formatScore(intelligence.mtf.mediumTerm.score)
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </CardContent>
+        </Card>
+
         {/* System */}
         <Card className="border-white/10 bg-white/[0.03]">
           <CardHeader>

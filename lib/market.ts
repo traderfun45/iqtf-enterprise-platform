@@ -27,7 +27,7 @@ export type Intelligence = {
   }
 
   volatilityRegime: {
-    regime: "LOW" | "NORMAL" | "HIGH"
+    regime: "LOW" | "NORMAL" | "ELEVATED" | "HIGH"
     score: number
     atrPercent: number
   }
@@ -58,7 +58,7 @@ export type Intelligence = {
       score: number
     }
 
-    alignment: "bullish" | "bearish" | "neutral"
+    alignment: "bullish" | "bearish" | "mixed" | "neutral"
     score: number
   }
 
