@@ -41,12 +41,11 @@ export default function MarketPage() {
         if (isInitialLoad) {
           setLoading(true)
         }
+
         setError(null)
 
-        const [snapshotData, intelligenceData] = await Promise.all([
-          getMarketSnapshot(),
-          getMarketIntelligence("XAUUSD", "1h", 50),
-        ])
+        // Fetch market snapshot first so prices update immediately.
+        const snapshotData = await getMarketSnapshot()
 
         const xauData = snapshotData.data.find(
           (item) => item.symbol === "XAUUSD"
@@ -60,8 +59,17 @@ export default function MarketPage() {
           throw new Error("Market snapshot data unavailable")
         }
 
+        // Keep last known good prices visible during refresh.
         setXau(xauData)
         setGc(gcData)
+
+        // Load intelligence separately after prices are updated.
+        const intelligenceData = await getMarketIntelligence(
+          "XAUUSD",
+          "1h",
+          50
+        )
+
         setIntelligence(intelligenceData)
       } catch (err) {
         setError(

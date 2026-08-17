@@ -52,10 +52,12 @@ export type Intelligence = {
       direction: "bullish" | "bearish" | "neutral"
       score: number
     }
+
     mediumTerm: {
       direction: "bullish" | "bearish" | "neutral"
       score: number
     }
+
     alignment: "bullish" | "bearish" | "neutral"
     score: number
   }
@@ -68,7 +70,10 @@ export type Intelligence = {
 }
 
 export async function getMarketSnapshot(): Promise<MarketSnapshot> {
-  return apiGet<MarketSnapshot>("/api/market/snapshot")
+  return apiGet<MarketSnapshot>(
+    "/api/market/snapshot",
+    5000
+  )
 }
 
 export async function getMarketIntelligence(
@@ -83,6 +88,7 @@ export async function getMarketIntelligence(
   })
 
   return apiGet<Intelligence>(
-    `/api/market/intelligence?${params.toString()}`
+    `/api/market/intelligence?${params.toString()}`,
+    15000
   )
 }
