@@ -56,6 +56,7 @@ function getDecision(
         severity: "low",
         totalImpact: 0,
         summary: "No live intelligence data available",
+        marketState: "none",
       },
     }
   }

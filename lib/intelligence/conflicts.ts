@@ -7,11 +7,13 @@ export type ConflictSeverity =
   | "low"
   | "medium"
   | "high"
+
 export type MarketConflictState =
   | "none"
   | "bullish_pullback"
   | "bearish_pullback"
   | "trend_reversal_risk"
+
 export type IntelligenceConflict = {
   factorId: string
   factorName: string
@@ -27,6 +29,7 @@ export type ConflictAnalysis = {
   severity: ConflictSeverity
   totalImpact: number
   summary: string
+  marketState: MarketConflictState
 }
 
 function getSeverity(
@@ -63,6 +66,75 @@ function explainConflict(
   }
 
   return `${factor.name} is reducing signal confidence`
+}
+
+function detectMarketConflictState(
+  analysis: FactorAnalysis
+): MarketConflictState {
+  const trend = analysis.factors.find(
+    (factor) => factor.id === "trend"
+  )
+
+  const structure = analysis.factors.find(
+    (factor) => factor.id === "structure"
+  )
+
+  const momentum = analysis.factors.find(
+    (factor) => factor.id === "momentum"
+  )
+
+  const mtf = analysis.factors.find(
+    (factor) => factor.id === "mtf"
+  )
+
+  if (!trend || !structure || !momentum || !mtf) {
+    return "none"
+  }
+
+  const bullishCore =
+    trend.direction === "bullish" &&
+    structure.direction === "bullish"
+
+  const bearishCore =
+    trend.direction === "bearish" &&
+    structure.direction === "bearish"
+
+  const bullishPullback =
+    bullishCore &&
+    mtf.direction === "bearish" &&
+    momentum.direction !== "bearish"
+
+  const bearishPullback =
+    bearishCore &&
+    mtf.direction === "bullish" &&
+    momentum.direction !== "bullish"
+
+  if (bullishPullback) {
+    return "bullish_pullback"
+  }
+
+  if (bearishPullback) {
+    return "bearish_pullback"
+  }
+
+  const bullishReversalRisk =
+    bullishCore &&
+    mtf.direction === "bearish" &&
+    momentum.direction === "bearish"
+
+  const bearishReversalRisk =
+    bearishCore &&
+    mtf.direction === "bullish" &&
+    momentum.direction === "bullish"
+
+  if (
+    bullishReversalRisk ||
+    bearishReversalRisk
+  ) {
+    return "trend_reversal_risk"
+  }
+
+  return "none"
 }
 
 export function detectIntelligenceConflicts(
@@ -110,11 +182,15 @@ export function detectIntelligenceConflicts(
       "Minor factor conflict detected; monitor confirmation"
   }
 
+  const marketState =
+    detectMarketConflictState(analysis)
+
   return {
     conflicts,
     hasConflict: conflicts.length > 0,
     severity,
     totalImpact,
     summary,
+    marketState,
   }
 }
