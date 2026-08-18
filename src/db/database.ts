@@ -24,3 +24,10 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 `)
+db.exec(`
+  INSERT OR IGNORE INTO markets (symbol, name, provider)
+  VALUES
+    ('XAUUSD', 'Gold Spot', 'twelvedata'),
+    ('GC', 'Gold Futures', 'cme'),
+    ('EURUSD', 'Euro / US Dollar', 'twelvedata');
+`)
