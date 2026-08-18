@@ -1,5 +1,5 @@
 "use client"
-
+export const dynamic = "force-dynamic"
 import { useEffect, useState } from "react"
 import {
   Brain,
@@ -16,6 +16,11 @@ import {
   type Intelligence,
 } from "@/lib/market"
 
+import {
+  buildIntelligenceDecision,
+  type IntelligenceDecision,
+} from "@/lib/intelligence/decision"
+
 function formatScore(value: number) {
   return value.toFixed(3)
 }
@@ -24,55 +29,38 @@ function formatPercent(value: number) {
   return `${value.toFixed(2)}%`
 }
 
-function getDecision(data: Intelligence | null) {
+function getDecision(
+  data: Intelligence | null
+): IntelligenceDecision {
   if (!data) {
     return {
       bias: "NEUTRAL",
       confidence: 0,
-      risk: "UNKNOWN",
+      risk: "NORMAL",
       action: "WAIT",
+      readiness: "NOT READY",
+      reason: "Live intelligence data is required",
+      confirmation: "WAITING",
+      constraint: "No execution without live data",
+      factors: {
+        factors: [],
+        supporting: [],
+        conflicting: [],
+        neutral: [],
+        primaryDriver: null,
+        confidence: 0,
+      },
+      conflicts: {
+        conflicts: [],
+        hasConflict: false,
+        severity: "low",
+        totalImpact: 0,
+        summary: "No live intelligence data available",
+      },
     }
   }
 
-  const absScore = Math.abs(data.score)
-  const confidence = Math.min(100, Math.round(absScore * 1000))
-
-  let bias = "NEUTRAL"
-
-  if (data.signal === "bullish") {
-    bias = "BULLISH"
-  } else if (data.signal === "bearish") {
-    bias = "BEARISH"
-  } else if (data.trend.direction === "bullish" && data.score > 0) {
-    bias = "BULLISH"
-  } else if (data.trend.direction === "bearish" && data.score < 0) {
-    bias = "BEARISH"
-  }
-
-  let risk = "NORMAL"
-
-  if (data.volatility.atrPercent >= 0.5) {
-    risk = "HIGH"
-  } else if (data.volatility.atrPercent >= 0.3) {
-    risk = "ELEVATED"
-  } else if (data.volatility.atrPercent < 0.15) {
-    risk = "LOW"
-  }
-
-  let action = "WAIT"
-
-  if (data.signal === "bullish" && data.score >= 0.1) {
-    action = "LONG BIAS"
-  } else if (data.signal === "bearish" && data.score <= -0.1) {
-    action = "SHORT BIAS"
-  }
-
-  return {
-    bias,
-    confidence,
-    risk,
-    action,
-  }
+  return buildIntelligenceDecision(data)
 }
 
 function getRiskPositionContext(
@@ -177,7 +165,7 @@ function getTradePlan(
   let planStatus = "CONFIRMATION REQUIRED"
 
   if (
-    decision.action === "LONG BIAS" &&
+    decision.action === "LONG WATCH" &&
     riskPosition.readiness === "CONFIRMED"
   ) {
     setup = "LONG SETUP"
@@ -188,7 +176,7 @@ function getTradePlan(
     riskReward = "1 : 1.5"
     planStatus = "READY"
   } else if (
-    decision.action === "SHORT BIAS" &&
+    decision.action === "SHORT WATCH" &&
     riskPosition.readiness === "CONFIRMED"
   ) {
     setup = "SHORT SETUP"
@@ -528,12 +516,14 @@ function getExecutiveSummary(
         ? "BEARISH"
         : "NEUTRAL"
 
-  const risk =
-    alert.level === "HIGH"
-      ? "HIGH"
-      : riskPosition.readiness === "CONFIRMED"
-        ? "ELEVATED"
-        : "CONTROLLED"
+    const risk =
+      alert.level === "HIGH"
+        ? "HIGH"
+        : decision.risk === "ELEVATED"
+          ? "ELEVATED"
+          : decision.risk === "LOW"
+            ? "LOW"
+            : "NORMAL"
 
   let verdict = "NEUTRAL — WAIT FOR CONFIRMATION"
 
@@ -604,8 +594,8 @@ function getSignalConfidence(
     return {
       confidence: 0,
       quality: "UNAVAILABLE",
-      trendAlignment: 0,
-      momentumAlignment: 0,
+      trendStrength: 0,
+      momentumStrength: 0,
       volatilityQuality: 0,
       decisionAlignment: 0,
       riskAlignment: 0,
@@ -614,52 +604,47 @@ function getSignalConfidence(
     }
   }
 
-  const trendScore = Math.abs(data.trend.score)
-  const momentumScore = Math.abs(data.momentum.score)
-  const atrPercent = data.volatility.atrPercent
+  const trendStrength = Math.round(
+    Math.min(100, Math.abs(data.trend.score) * 500)
+  )
 
-  const trendAlignment = Math.min(100, trendScore * 500)
-  const momentumAlignment = Math.min(100, momentumScore * 500)
+  const momentumStrength = Math.round(
+    Math.min(100, Math.abs(data.momentum.score) * 500)
+  )
+
+  const atrPercent = data.volatility.atrPercent
 
   let volatilityQuality = 70
 
   if (atrPercent >= 0.5) {
     volatilityQuality = 25
-  } else if (atrPercent >= 0.35) {
+  } else if (atrPercent >= 0.3) {
     volatilityQuality = 50
   } else if (atrPercent < 0.15) {
     volatilityQuality = 55
   }
 
-  let decisionAlignment = 50
-
-  if (decision.action !== "WAIT") {
-    decisionAlignment = monitoring.confirmation === "CONFIRMED"
+  const decisionAlignment =
+    decision.readiness === "CONFIRMED"
       ? 100
-      : monitoring.confirmation === "DEVELOPING"
+      : decision.readiness === "WATCH"
         ? 65
-        : 35
-  } else if (monitoring.confirmation === "WAITING") {
-    decisionAlignment = 70
-  }
+        : decision.action === "PROTECT"
+          ? 30
+          : 40
 
-  let riskAlignment = 70
+  const riskAlignment =
+    decision.risk === "HIGH"
+      ? 30
+      : decision.risk === "ELEVATED"
+        ? 55
+        : decision.risk === "LOW"
+          ? 90
+          : 75
 
-  if (alert.level === "HIGH") {
-    riskAlignment = 30
-  } else if (riskPosition.readiness === "CONFIRMED") {
-    riskAlignment = 90
-  } else if (riskPosition.readiness === "WATCH") {
-    riskAlignment = 65
-  }
-
-  const confidence = Math.round(
-    trendAlignment * 0.30 +
-    momentumAlignment * 0.25 +
-    volatilityQuality * 0.15 +
-    decisionAlignment * 0.20 +
-    riskAlignment * 0.10
-  )
+  // Single source of truth:
+  // Executive decision confidence is the authoritative confidence.
+  const confidence = decision.confidence
 
   let quality = "WEAK"
 
@@ -669,37 +654,51 @@ function getSignalConfidence(
     quality = "MODERATE"
   }
 
-  let reason = "Multiple market factors are aligned"
+  let reason =
+    "Directional evidence is weak and confirmation is incomplete"
 
-  if (confidence >= 75) {
-    reason = "Trend, momentum, decision and risk conditions are strongly aligned"
-  } else if (confidence >= 50) {
-    reason = "Some conditions are aligned, but confirmation remains incomplete"
-  } else {
-    reason = "Directional evidence is weak and confirmation is incomplete"
+  if (decision.readiness === "CONFIRMED") {
+    reason =
+      "Trend, momentum, decision and risk conditions support the current directional bias"
+  } else if (decision.readiness === "WATCH") {
+    reason =
+      "Directional evidence is developing, but confirmation remains incomplete"
+  } else if (decision.action === "PROTECT") {
+    reason =
+      "Volatility or risk conditions require protection before new directional exposure"
+  }
+
+  if (data.mtf.alignment === "mixed") {
+    reason =
+      "MTF alignment is mixed; directional confirmation remains incomplete"
   }
 
   let weakness = "No major weakness detected"
 
-  if (momentumAlignment < 35) {
-    weakness = "Momentum confirmation is weak"
-  } else if (trendAlignment < 35) {
+  if (data.mtf.alignment === "mixed") {
+    weakness = "Multi-timeframe alignment is mixed"
+  } else if (decision.conflicts.hasConflict) {
+    weakness =
+      "Intelligence conflicts are reducing directional conviction"
+  } else if (momentumStrength < 35) {
+    weakness = "Momentum strength is weak"
+  } else if (trendStrength < 35) {
     weakness = "Trend strength is weak"
   } else if (volatilityQuality < 40) {
     weakness = "Volatility conditions reduce signal quality"
-  } else if (decisionAlignment < 50) {
-    weakness = "Decision and market confirmation are not aligned"
-  } else if (riskAlignment < 50) {
-    weakness = "Risk conditions reduce decision quality"
+  } else if (decision.risk === "HIGH") {
+    weakness = "Risk conditions require protection"
   } else if (monitoring.scenario === "NEUTRAL") {
     weakness = "No clear directional scenario is active"
+  } else if (alert.level === "HIGH") {
+    weakness = "Active alert conditions reduce decision quality"
   }
 
   return {
     confidence,
     quality,
-    trendAlignment: Math.round(trendAlignment),
-    momentumAlignment: Math.round(momentumAlignment),
+    trendStrength,
+    momentumStrength,
     volatilityQuality,
     decisionAlignment,
     riskAlignment,
@@ -1430,7 +1429,7 @@ export default function AIAnalysisPage() {
             </h2>
 
             <p className="text-xs text-zinc-500">
-              Confidence derived from trend, momentum, volatility, decision and risk alignment
+              Decision confidence is authoritative; factor scores are diagnostic
             </p>
           </div>
         </div>
@@ -1458,21 +1457,21 @@ export default function AIAnalysisPage() {
 
           <div className="rounded-lg bg-zinc-900 p-4">
             <p className="text-xs text-zinc-500">
-              Trend Alignment
+              Trend Strength
             </p>
 
             <p className="mt-2 text-2xl font-bold text-white">
-              {signalConfidence.trendAlignment}%
+              {signalConfidence.trendStrength}%
             </p>
           </div>
 
           <div className="rounded-lg bg-zinc-900 p-4">
             <p className="text-xs text-zinc-500">
-              Momentum Alignment
+              Momentum Strength
             </p>
 
             <p className="mt-2 text-2xl font-bold text-white">
-              {signalConfidence.momentumAlignment}%
+              {signalConfidence.momentumStrength}%
             </p>
           </div>
         </div>

@@ -7,7 +7,11 @@ export type ConflictSeverity =
   | "low"
   | "medium"
   | "high"
-
+export type MarketConflictState =
+  | "none"
+  | "bullish_pullback"
+  | "bearish_pullback"
+  | "trend_reversal_risk"
 export type IntelligenceConflict = {
   factorId: string
   factorName: string
