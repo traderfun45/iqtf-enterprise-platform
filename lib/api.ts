@@ -1,5 +1,5 @@
 const API =
-  process.env.NEXT_PUBLIC_API_URL ?? "https://iqtf-enterprise-platform-2.onrender.com"
+  process.env.NEXT_PUBLIC_API_URL ?? "https://iqtf-enterprise-api.onrender.com"
 
 const DEFAULT_TIMEOUT_MS = 8000
 
