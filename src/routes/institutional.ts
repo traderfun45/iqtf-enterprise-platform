@@ -62,11 +62,6 @@ export async function institutionalRoutes(
       const previousCot =
         cotHistory[1]
 
-      const cot =
-        analyzeCotIntelligence({
-          latest: latestCot,
-          previous: previousCot,
-        })
       if (
         !latestCme ||
         latestCme.settlementPrice === undefined
@@ -83,6 +78,12 @@ export async function institutionalRoutes(
             'No COT market data available',
         })
       }
+
+      const cot =
+        analyzeCotIntelligence({
+          latest: latestCot,
+          previous: previousCot,
+        })
 
       const {
         historicalVolumeChanges,
@@ -139,10 +140,10 @@ export async function institutionalRoutes(
 
       return {
         success: true,
-
         symbol,
 
         cme,
+
         vol2vol,
 
         cot: {
