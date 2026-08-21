@@ -1,5 +1,6 @@
-const API =
-  process.env.NEXT_PUBLIC_API_URL ?? "https://iqtf-enterprise-api.onrender.com"
+export const API =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "https://iqtf-enterprise-api.onrender.com"
 
 const DEFAULT_TIMEOUT_MS = 8000
 
@@ -28,7 +29,10 @@ export async function apiGet<T>(
 
     return await response.json() as T
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (
+      error instanceof DOMException &&
+      error.name === "AbortError"
+    ) {
       throw new Error(`Request timeout after ${timeoutMs}ms`)
     }
 

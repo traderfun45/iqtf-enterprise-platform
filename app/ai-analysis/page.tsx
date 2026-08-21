@@ -13,7 +13,11 @@ import {
 
 import {
   getMarketIntelligence,
+  getCmeAnalysis,
+  getInstitutionalAnalysis,
   type Intelligence,
+  type CmeAnalysis,
+  type InstitutionalAnalysis,
 } from "@/lib/market"
 
 import {
@@ -712,6 +716,8 @@ export default function AIAnalysisPage() {
 
 
   const [data, setData] = useState<Intelligence | null>(null)
+  const [cmeData, setCmeData] = useState<CmeAnalysis | null>(null)
+  const [institutionalData, setInstitutionalData] = useState<InstitutionalAnalysis | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -726,13 +732,19 @@ export default function AIAnalysisPage() {
 
       setError(null)
 
-      const result = await getMarketIntelligence(
-        "XAUUSD",
-        "1h",
-        50
-      )
+      const [result, cmeResult, institutionalResult] = await Promise.all([
+        getMarketIntelligence(
+          "XAUUSD",
+          "1h",
+          50
+        ),
+        getCmeAnalysis("GC"),
+        getInstitutionalAnalysis("GC"),
+      ])
 
       setData(result)
+      setCmeData(cmeResult)
+      setInstitutionalData(institutionalResult)
     } catch (err) {
       setError(
         err instanceof Error
@@ -1374,6 +1386,172 @@ export default function AIAnalysisPage() {
               {tradePlan.planStatus}
             </p>
           </div>
+        </div>
+
+        {/* CME + Institutional Flow */}
+        <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/[0.03] p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-amber-400">
+                CME + Institutional Flow
+              </p>
+
+              <p className="mt-1 text-xs text-zinc-500">
+                GC Futures · CME + Vol2Vol + COT institutional intelligence
+              </p>
+            </div>
+
+            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+              {institutionalData ? "LIVE" : "WAITING"}
+            </span>
+          </div>
+
+          {cmeData ? (
+            <>
+              <div className="mt-4 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+
+                <div className="rounded-lg bg-zinc-900 p-3">
+                  <p className="text-xs text-zinc-500">
+                    GC Price
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-white">
+                    {cmeData.data.settlementPrice?.toFixed(2) ?? "—"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-zinc-900 p-3">
+                  <p className="text-xs text-zinc-500">
+                    Volume
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-white">
+                    {cmeData.data.volume?.toLocaleString() ?? "—"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-zinc-900 p-3">
+                  <p className="text-xs text-zinc-500">
+                    Open Interest
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-white">
+                    {cmeData.data.openInterest?.toLocaleString() ?? "—"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-zinc-900 p-3">
+                  <p className="text-xs text-zinc-500">
+                    Positioning
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-emerald-400">
+                    {institutionalData?.cme.positioning ?? cmeData.intelligence.positioning}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-zinc-900 p-3">
+                  <p className="text-xs text-zinc-500">
+                    Vol2Vol
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-sky-400">
+                    {institutionalData?.vol2vol.signal ?? cmeData.vol2vol.signal}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-zinc-900 p-3">
+                  <p className="text-xs text-zinc-500">
+                    Score
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-white">
+                    {institutionalData?.vol2vol.score ?? cmeData.vol2vol.score}
+                  </p>
+                </div>
+
+              </div>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+
+                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                  <p className="text-xs text-zinc-500">
+                    Volume Confirmation
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-zinc-300">
+                    {institutionalData?.cme.volumeConfirmation ?? cmeData.intelligence.volumeConfirmation}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                  <p className="text-xs text-zinc-500">
+                    OI Confirmation
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-zinc-300">
+                    {institutionalData?.cme.oiConfirmation ?? cmeData.intelligence.oiConfirmation}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                  <p className="text-xs text-zinc-500">
+                    State
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-emerald-400">
+                    {cmeData.vol2volState.state}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                  <p className="text-xs text-zinc-500">
+                    Action
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-amber-400">
+                    {cmeData.vol2volState.action}
+                  </p>
+                </div>
+
+              </div>
+
+              <div className="mt-3 rounded-lg border border-sky-500/10 bg-sky-500/[0.03] p-3">
+                <p className="text-xs text-zinc-500">
+                  Institutional Interpretation
+                </p>
+
+                <p className="mt-1 text-sm text-zinc-300">
+                  {institutionalData?.vol2vol.reasons.join(" · ") ?? cmeData.vol2vol.reasons.join(" · ")}
+              <div className="mt-3 rounded-lg border border-emerald-500/10 bg-emerald-500/[0.03] p-3">
+                <p className="text-xs uppercase tracking-wider text-emerald-400">
+                  COT Institutional Positioning
+                </p>
+                <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <p className="text-xs text-zinc-500">Managed Money Net</p>
+                    <p className="mt-1 text-sm font-bold text-white">
+                      {institutionalData?.cot.intelligence.managedMoneyNet.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-zinc-500">Producer Net</p>
+                    <p className="mt-1 text-sm font-bold text-white">
+                      {institutionalData?.cot.intelligence.producerNet.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-zinc-500">Swap Dealer Net</p>
+                    <p className="mt-1 text-sm font-bold text-white">
+                      {institutionalData?.cot.intelligence.swapDealerNet.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-zinc-500">Positioning</p>
+                    <p className="mt-1 text-sm font-bold text-emerald-400">
+                      {institutionalData?.cot.intelligence.positioning}
+                    </p>
+                  </div>
+                </div>
+              </div>
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="mt-4 rounded-lg bg-zinc-900 p-4 text-sm text-zinc-500">
+              Waiting for CME GC institutional flow data...
+            </div>
+          )}
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-3">

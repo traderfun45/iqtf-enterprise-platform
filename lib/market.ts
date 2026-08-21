@@ -92,3 +92,160 @@ export async function getMarketIntelligence(
     15000
   )
 }
+export type CmeAnalysis = {
+  success: boolean
+  symbol: string
+
+  data: {
+    id: number
+    symbol: string
+    dataDate: string
+    dataTime: string
+    settlementPrice: number
+    volume?: number
+    volumeZscore?: number
+    openInterest?: number
+    oiChange?: number
+    oiZscore?: number
+    source: string
+    inputMethod: string
+  }
+
+  intelligence: {
+    priceChange: number
+    priceChangePercent: number
+    volumeChange: number
+    volumeChangePercent: number
+    openInterestChange: number
+    openInterestChangePercent: number
+    volumeZscore: number
+    oiZscore: number
+    positioning: string
+    volumeConfirmation: string
+    oiConfirmation: string
+    confirmationScore: number
+  }
+
+  vol2vol: {
+    signal: string
+    confidence: string
+    score: number
+    priceDirection: string
+    volumeDirection: string
+    oiDirection: string
+    positioning: string
+    reasons: string[]
+  }
+
+  vol2volState: {
+    previousState: string
+    state: string
+    signal: string
+    confidence: string
+    action: string
+  }
+
+  previousState: string
+
+  savedState: {
+    symbol: string
+    state: string
+    signal: string
+    confidence: string
+    action: string
+    updatedAt?: string
+  }
+
+  historyStats: {
+    records: number
+    volumeChangeSamples: number
+    oiChangeSamples: number
+  }
+}
+
+export async function getCmeAnalysis(
+  symbol = "GC"
+): Promise<CmeAnalysis> {
+  return apiGet<CmeAnalysis>(
+    `/api/cme/analysis?symbol=${encodeURIComponent(symbol)}`,
+    10000
+  )
+}
+
+export type InstitutionalAnalysis = {
+  success: boolean
+  symbol: string
+
+  cme: CmeAnalysis["intelligence"]
+
+  vol2vol: CmeAnalysis["vol2vol"]
+
+  cot: {
+    intelligence: {
+      managedMoneyNet: number
+      producerNet: number
+      swapDealerNet: number
+      otherReportablesNet: number
+
+      managedMoneyNetChange: number
+      producerNetChange: number
+      swapDealerNetChange: number
+      otherReportablesNetChange: number
+
+      positioning: string
+      confidence: string
+      score: number
+      reasons: string[]
+    }
+
+    latest: {
+      id: number
+      symbol: string
+      reportDate: string
+      openInterest: number
+      producerLong: number
+      producerShort: number
+      swapDealerLong: number
+      swapDealerShort: number
+      managedMoneyLong: number
+      managedMoneyShort: number
+      otherReportablesLong: number
+      otherReportablesShort: number
+      source: string
+      note?: string
+    }
+
+    previous?: {
+      id: number
+      symbol: string
+      reportDate: string
+      openInterest: number
+      producerLong: number
+      producerShort: number
+      swapDealerLong: number
+      swapDealerShort: number
+      managedMoneyLong: number
+      managedMoneyShort: number
+      otherReportablesLong: number
+      otherReportablesShort: number
+      source: string
+      note?: string
+    }
+  }
+
+  historyStats: {
+    cmeRecords: number
+    cotRecords: number
+    volumeChangeSamples: number
+    oiChangeSamples: number
+  }
+}
+
+export async function getInstitutionalAnalysis(
+  symbol = "GC"
+): Promise<InstitutionalAnalysis> {
+  return apiGet<InstitutionalAnalysis>(
+    `/api/institutional/analysis?symbol=${encodeURIComponent(symbol)}`,
+    10000
+  )
+}
