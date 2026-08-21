@@ -41,7 +41,26 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by TEXT
   );
-    CREATE TABLE IF NOT EXISTS vol2vol_state (
+    CREATE TABLE IF NOT EXISTS cot_market_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    report_date TEXT NOT NULL,
+    open_interest INTEGER,
+    producer_long INTEGER,
+    producer_short INTEGER,
+    swap_dealer_long INTEGER,
+    swap_dealer_short INTEGER,
+    managed_money_long INTEGER,
+    managed_money_short INTEGER,
+    other_reportables_long INTEGER,
+    other_reportables_short INTEGER,
+    source TEXT NOT NULL DEFAULT 'CFTC',
+    note TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS vol2vol_state (
     symbol TEXT PRIMARY KEY,
     state TEXT NOT NULL DEFAULT 'NO_POSITION',
     signal TEXT NOT NULL DEFAULT 'NO_TRADE',
