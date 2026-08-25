@@ -48,6 +48,8 @@ export type MarketIntelligence = {
   mtf: MTFSignal
   score: number
   signal: 'bullish' | 'bearish' | 'neutral'
+  confidence: number
+  riskState: 'LOW' | 'NORMAL' | 'ELEVATED' | 'HIGH'
   timestamp: string
 }
 
@@ -76,7 +78,6 @@ export function calculateTrend(
   }
 
   const ordered = chronologicalCandles(candles)
-
   const first = ordered[0]
   const latest = ordered[ordered.length - 1]
 
@@ -85,23 +86,19 @@ export function calculateTrend(
       ? ((latest.close - first.close) / first.close) * 100
       : 0
 
-  if (changePercent > 0) {
-    return {
-      direction: 'bullish',
-      score: clamp(changePercent / 1, 0, 1)
-    }
-  }
+  const score = clamp(changePercent / 1, -1, 1)
 
-  if (changePercent < 0) {
-    return {
-      direction: 'bearish',
-      score: clamp(changePercent / 1, -1, 0)
-    }
+  let direction: TrendSignal['direction'] = 'neutral'
+
+  if (score > 0.05) {
+    direction = 'bullish'
+  } else if (score < -0.05) {
+    direction = 'bearish'
   }
 
   return {
-    direction: 'neutral',
-    score: 0
+    direction,
+    score
   }
 }
 
@@ -175,20 +172,21 @@ export function calculateMomentum(
 
   const ordered = chronologicalCandles(candles)
 
-  const latest =
-    ordered[ordered.length - 1].close
+  const window = ordered.slice(
+    Math.max(0, ordered.length - Math.min(4, ordered.length))
+  )
 
-  const previous =
-    ordered[ordered.length - 2].close
+  const first = window[0]
+  const latest = window[window.length - 1]
 
   const value =
-    previous !== 0
-      ? ((latest - previous) / previous) * 100
+    first.close !== 0
+      ? ((latest.close - first.close) / first.close) * 100
       : 0
 
   return {
     value,
-    score: clamp(value / 0.1, -1, 1)
+    score: clamp(value / 0.30, -1, 1)
   }
 }
 
@@ -208,9 +206,6 @@ export function calculateStructure(
   }
 
   const ordered = chronologicalCandles(candles)
-
-  const previous = ordered[ordered.length - 2]
-  const latest = ordered[ordered.length - 1]
 
   const midpoint = Math.max(
     2,
@@ -238,31 +233,26 @@ export function calculateStructure(
 
   const higherHigh = latestHigh > previousHigh
   const higherLow = latestLow > previousLow
+
   const lowerHigh = latestHigh < previousHigh
   const lowerLow = latestLow < previousLow
 
-  let direction: StructureSignal['direction'] = 'neutral'
   let score = 0
 
-  if (higherHigh && higherLow) {
+  if (higherHigh) score += 0.5
+  if (higherLow) score += 0.5
+
+  if (lowerHigh) score -= 0.5
+  if (lowerLow) score -= 0.5
+
+  score = clamp(score, -1, 1)
+
+  let direction: StructureSignal['direction'] = 'neutral'
+
+  if (score > 0.05) {
     direction = 'bullish'
-    score = 1
-  } else if (lowerHigh && lowerLow) {
+  } else if (score < -0.05) {
     direction = 'bearish'
-    score = -1
-  } else {
-    const recentChange =
-      previous.close !== 0
-        ? ((latest.close - previous.close) / previous.close) * 100
-        : 0
-
-    score = clamp(recentChange / 0.1, -0.5, 0.5)
-
-    if (score > 0.05) {
-      direction = 'bullish'
-    } else if (score < -0.05) {
-      direction = 'bearish'
-    }
   }
 
   return {
@@ -284,7 +274,7 @@ export function calculateVolatilityRegime(
   if (atrPercent < 0.15) {
     return {
       regime: 'LOW',
-      score: -1,
+      score: 0,
       atrPercent
     }
   }
@@ -300,14 +290,14 @@ export function calculateVolatilityRegime(
   if (atrPercent < 0.50) {
     return {
       regime: 'ELEVATED',
-      score: -0.4,
+      score: -0.2,
       atrPercent
     }
   }
 
   return {
     regime: 'HIGH',
-    score: -1,
+    score: -0.4,
     atrPercent
   }
 }
@@ -427,6 +417,37 @@ export function calculateMarketIntelligence(
     signal = 'bearish'
   }
 
+  const directionalAgreement =
+    (
+      Math.abs(trend.score) +
+      Math.abs(structure.score) +
+      Math.abs(mtf.score)
+    ) / 3
+
+  const scoreStrength = Math.abs(score)
+
+  const volatilityPenalty =
+    volatilityRegime.regime === 'HIGH'
+      ? 0.15
+      : volatilityRegime.regime === 'ELEVATED'
+        ? 0.05
+        : 0
+
+  const confidence = Math.round(
+    clamp(
+      (
+        scoreStrength * 0.60 +
+        directionalAgreement * 0.40 -
+        volatilityPenalty
+      ) * 100,
+      0,
+      100
+    )
+  )
+
+  const riskState: MarketIntelligence['riskState'] =
+    volatilityRegime.regime
+
   return {
     symbol,
     trend,
@@ -437,6 +458,8 @@ export function calculateMarketIntelligence(
     mtf,
     score,
     signal,
+    confidence,
+    riskState,
     timestamp: new Date().toISOString()
   }
 }
