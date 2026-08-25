@@ -24,6 +24,26 @@ import {
   buildHistoricalChanges,
 } from '../services/institutional.js'
 
+import {
+  getMarketProvider,
+} from '../providers/market/index.js'
+
+import {
+  getMarketBySymbol,
+} from '../db/markets.js'
+
+import {
+  calculateMarketIntelligence,
+} from '../services/market/intelligence.js'
+
+import {
+  getCachedMarketIntelligence,
+} from '../services/market/intelligenceCache.js'
+
+import {
+  calculateIqtfDecision,
+} from '../services/iqtfDecision.js'
+
 export async function institutionalRoutes(
   app: FastifyInstance,
 ) {
@@ -138,9 +158,122 @@ export async function institutionalRoutes(
             cme.positioning,
         })
 
+      const marketIntelligence =
+        await getCachedMarketIntelligence(
+          `${symbol}:1h:50`,
+          async () => {
+            const market =
+              getMarketBySymbol(symbol)
+
+            if (!market) {
+              throw new Error(
+                `Market symbol not found: ${symbol}`,
+              )
+            }
+
+            const provider =
+              getMarketProvider(
+                market.provider ?? 'mock',
+              )
+
+            if (
+              typeof provider.getHistory !==
+              'function'
+            ) {
+              throw new Error(
+                `Historical data is not supported for ${symbol}`,
+              )
+            }
+
+            const candles =
+              await provider.getHistory(
+                symbol,
+                {
+                  interval: '1h',
+                  outputsize: 50,
+                },
+              )
+
+            return {
+              intelligence:
+                calculateMarketIntelligence(
+                  candles,
+                ),
+              candleCount:
+                candles.length,
+            }
+          },
+        )
+
+      const iqtfDecision =
+        calculateIqtfDecision({
+          marketScore:
+            marketIntelligence.intelligence.score,
+
+          cmeConfirmation:
+            cme.confirmationScore,
+
+          vol2volScore:
+            vol2vol.score,
+
+          marketSignal:
+            marketIntelligence.intelligence.signal,
+
+          marketStructure:
+            marketIntelligence
+              .intelligence
+              .structure
+              .direction,
+
+          volatilityRegime:
+            marketIntelligence
+              .intelligence
+              .volatilityRegime
+              .regime,
+
+          cmePositioning:
+            cme.positioning,
+            
+            cotScore:
+              cot.score,
+
+            cotPositioning:
+              cot.positioning,
+
+          cmeOiConfirmation:
+            cme.oiConfirmation,
+
+          vol2volSignal:
+            vol2vol.signal,
+        })
+
       return {
         success: true,
+
         symbol,
+
+        marketIntelligence:
+          marketIntelligence.intelligence,
+
+        iqtfDecision,
+
+          summary: {
+            decision: iqtfDecision.decision,
+            confidence: iqtfDecision.confidence,
+            riskState: iqtfDecision.riskState,
+            compositeScore: iqtfDecision.compositeScore,
+
+            institutionalAlignment:
+              iqtfDecision.compositeScore > 0.25
+                ? 'BULLISH'
+                : iqtfDecision.compositeScore < -0.25
+                  ? 'BEARISH'
+                  : 'NEUTRAL',
+
+            components: iqtfDecision.components,
+            reasons: iqtfDecision.reasons,
+            warnings: iqtfDecision.warnings,
+          },
 
         cme,
 

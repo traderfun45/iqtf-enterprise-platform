@@ -11,7 +11,14 @@ import {
   TrendingUp,
 } from "lucide-react"
 
-import { getMarketSnapshot, getMarketIntelligence, type Quote, type Intelligence } from "@/lib/market"
+import {
+  getMarketSnapshot,
+  getMarketIntelligence,
+  getInstitutionalAnalysis,
+  type Quote,
+  type Intelligence,
+  type InstitutionalAnalysis,
+} from "@/lib/market"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AppShell } from "@/components/layout/app-shell"
@@ -33,19 +40,38 @@ export default function MarketPage() {
   const [intelligence, setIntelligence] =
     useState<Intelligence | null>(null)
 
+  const [institutional, setInstitutional] =
+    useState<InstitutionalAnalysis | null>(null)
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
     async function loadMarket(isInitialLoad = false) {
+      if (isInitialLoad) {
+        setLoading(true)
+      }
+
+      setError(null)
+
+      // ============================================================
+      // LOAD ALL MARKET DATA IN PARALLEL
+      // ============================================================
+
+      const snapshotPromise = getMarketSnapshot()
+      const intelligencePromise = getMarketIntelligence(
+        "XAUUSD",
+        "1h",
+        50
+      )
+      const institutionalPromise =
+        getInstitutionalAnalysis("GC")
+
+      // ============================================================
+      // MARKET SNAPSHOT
+      // ============================================================
+
       try {
-        if (isInitialLoad) {
-          setLoading(true)
-        }
-
-        setError(null)
-
-        // Fetch market snapshot first so prices update immediately.
-        const snapshotData = await getMarketSnapshot()
+        const snapshotData = await snapshotPromise
 
         const xauData = snapshotData.data.find(
           (item) => item.symbol === "XAUUSD"
@@ -59,37 +85,79 @@ export default function MarketPage() {
           throw new Error("Market snapshot data unavailable")
         }
 
-        // Keep last known good prices visible during refresh.
         setXau(xauData)
         setGc(gcData)
-
-        // Load intelligence separately after prices are updated.
-        const intelligenceData = await getMarketIntelligence(
-          "XAUUSD",
-          "1h",
-          50
+      } catch (snapshotErr) {
+        console.error(
+          "[Market] Snapshot load failed:",
+          snapshotErr
         )
+      }
+
+      // ============================================================
+      // MARKET INTELLIGENCE
+      // ============================================================
+
+      try {
+        const intelligenceData =
+          await intelligencePromise
 
         setIntelligence(intelligenceData)
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load market data"
+      } catch (intelligenceErr) {
+        console.error(
+          "[Market] Intelligence load failed:",
+          intelligenceErr
         )
-      } finally {
-        if (isInitialLoad) {
-          setLoading(false)
-        }
+      }
+
+      // ============================================================
+      // INSTITUTIONAL ANALYSIS
+      // ============================================================
+
+      try {
+        const institutionalData =
+          await institutionalPromise
+
+        setInstitutional(institutionalData)
+      } catch (institutionalErr) {
+        console.error(
+          "[Market] Institutional analysis load failed:",
+          institutionalErr
+        )
+      }
+
+      if (isInitialLoad) {
+        setLoading(false)
       }
     }
 
   useEffect(() => {
-    loadMarket(true)
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
 
-    const timer = setInterval(loadMarket, 30000)
+    const refresh = async () => {
+      if (cancelled) return
 
-    return () => clearInterval(timer)
+      await loadMarket(false)
+
+      if (!cancelled) {
+        timer = setTimeout(refresh, 30000)
+      }
+    }
+
+    loadMarket(true).finally(() => {
+      if (!cancelled) {
+        timer = setTimeout(refresh, 30000)
+      }
+    })
+
+    return () => {
+      cancelled = true
+
+      if (timer) {
+        clearTimeout(timer)
+      }
+    }
   }, [])
 
   const bullish =
@@ -485,6 +553,234 @@ export default function MarketPage() {
                         : "—"}
                     </div>
                   </div>
+                </div>
+              </div>
+
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Institutional Dashboard */}
+        <Card className="border-white/10 bg-white/[0.03]">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base text-white">
+                Institutional Dashboard
+              </CardTitle>
+              <p className="mt-1 text-xs text-zinc-500">
+                CME · Vol2Vol · COT · IQTF Composite
+              </p>
+            </div>
+
+            <Badge
+              variant="outline"
+              className={
+                institutional?.summary.institutionalAlignment === "BULLISH"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                  : institutional?.summary.institutionalAlignment === "BEARISH"
+                    ? "border-red-500/30 bg-red-500/10 text-red-400"
+                    : "border-white/10 text-zinc-400"
+              }
+            >
+              {institutional?.summary.institutionalAlignment ?? "—"}
+            </Badge>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+
+              {/* IQTF Decision */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  IQTF Decision
+                </div>
+
+                <div
+                  className={
+                    institutional?.summary.decision === "LONG" ||
+                    institutional?.summary.decision === "LONG_WATCH"
+                      ? "mt-3 text-2xl font-bold text-emerald-400"
+                      : institutional?.summary.decision === "SHORT" ||
+                          institutional?.summary.decision === "SHORT_WATCH"
+                        ? "mt-3 text-2xl font-bold text-red-400"
+                        : "mt-3 text-2xl font-bold text-zinc-300"
+                  }
+                >
+                  {institutional?.summary.decision ?? "—"}
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Composite Score{" "}
+                  {institutional
+                    ? institutional.summary.compositeScore.toFixed(3)
+                    : "—"}
+                </div>
+              </div>
+
+              {/* Confidence */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Confidence
+                </div>
+
+                <div className="mt-3 text-2xl font-bold text-white">
+                  {institutional
+                    ? `${institutional.summary.confidence.toFixed(0)}%`
+                    : "—"}
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Risk State{" "}
+                  <span className="text-zinc-300">
+                    {institutional?.summary.riskState ?? "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Institutional Alignment */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Institutional Alignment
+                </div>
+
+                <div className="mt-3 text-lg font-semibold text-white">
+                  {institutional?.summary.institutionalAlignment ?? "—"}
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  CME{" "}
+                  {institutional
+                    ? institutional.summary.components.cme.toFixed(3)
+                    : "—"}
+                  {" · "}
+                  Vol2Vol{" "}
+                  {institutional
+                    ? institutional.summary.components.vol2vol.toFixed(3)
+                    : "—"}
+                </div>
+              </div>
+
+              {/* COT */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  COT Positioning
+                </div>
+
+                <div className="mt-3 text-lg font-semibold text-white">
+                  {institutional?.cot.intelligence.positioning ?? "—"}
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Score{" "}
+                  {institutional
+                    ? institutional.cot.intelligence.score.toFixed(3)
+                    : "—"}
+                  {" · "}
+                  Confidence{" "}
+                  {institutional?.cot.intelligence.confidence ?? "—"}
+                </div>
+              </div>
+            </div>
+
+            {/* Component Scores */}
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="mb-3 text-xs text-zinc-500">
+                IQTF Composite Components
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div>
+                  <div className="text-[11px] text-zinc-600">
+                    Market
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    {institutional
+                      ? institutional.summary.components.market.toFixed(3)
+                      : "—"}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[11px] text-zinc-600">
+                    CME
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    {institutional
+                      ? institutional.summary.components.cme.toFixed(3)
+                      : "—"}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[11px] text-zinc-600">
+                    Vol2Vol
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    {institutional
+                      ? institutional.summary.components.vol2vol.toFixed(3)
+                      : "—"}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[11px] text-zinc-600">
+                    COT
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    {institutional
+                      ? institutional.summary.components.cot.toFixed(3)
+                      : "—"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Reasons / Warnings */}
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  IQTF Reasons
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {institutional?.summary.reasons?.length ? (
+                    institutional.summary.reasons.map((reason, index) => (
+                      <div
+                        key={`reason-${index}`}
+                        className="text-sm text-zinc-300"
+                      >
+                        • {reason}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-zinc-600">
+                      —
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Warnings
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {institutional?.summary.warnings?.length ? (
+                    institutional.summary.warnings.map((warning, index) => (
+                      <div
+                        key={`warning-${index}`}
+                        className="text-sm text-amber-400"
+                      >
+                        • {warning}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-zinc-600">
+                      No active warnings
+                    </div>
+                  )}
                 </div>
               </div>
 

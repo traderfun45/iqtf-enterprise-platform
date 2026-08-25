@@ -32,7 +32,11 @@ import {
 } from "@/lib/system"
 import { buildIntelligenceExplanation } from "@/lib/intelligence/explanation"
 
-function formatPrice(value: number) {
+function formatPrice(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—"
+  }
+
   return value.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -367,9 +371,9 @@ export default function Home() {
 
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2">
-                {[xau, gc].map((quote) => (
+                {[xau, gc].map((quote, index) => (
                   <div
-                    key={quote?.symbol ?? "unknown"}
+                    key={quote?.symbol ?? `quote-${index}`}
                     className="rounded-xl border border-white/10 bg-black/20 p-4"
                   >
                     <div className="flex items-center justify-between">

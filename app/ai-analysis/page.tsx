@@ -34,7 +34,8 @@ function formatPercent(value: number) {
 }
 
 function getDecision(
-  data: Intelligence | null
+  data: Intelligence | null,
+  cmeData: CmeAnalysis | null
 ): IntelligenceDecision {
   if (!data) {
     return {
@@ -62,6 +63,65 @@ function getDecision(
         summary: "No live intelligence data available",
         marketState: "none",
       },
+    }
+  }
+
+  const backend = cmeData?.iqtfDecision
+
+  if (backend) {
+    const bias =
+      backend.decision === "LONG" || backend.decision === "LONG_WATCH"
+        ? "BULLISH"
+        : backend.decision === "SHORT" || backend.decision === "SHORT_WATCH"
+          ? "BEARISH"
+          : "NEUTRAL"
+
+const action =
+  backend.decision === "LONG"
+    ? "LONG WATCH"
+    : backend.decision === "LONG_WATCH"
+      ? "LONG WATCH"
+      : backend.decision === "SHORT"
+        ? "SHORT WATCH"
+        : backend.decision === "SHORT_WATCH"
+          ? "SHORT WATCH"
+          : "WAIT"
+
+
+    const readiness =
+      backend.decision === "LONG" || backend.decision === "SHORT"
+        ? "CONFIRMED"
+        : backend.decision === "LONG_WATCH" ||
+            backend.decision === "SHORT_WATCH"
+          ? "WATCH"
+          : "NOT READY"
+
+    const reason =
+      backend.reasons.length > 0
+        ? backend.reasons.join(" · ")
+        : "Backend IQTF decision is active"
+
+    const confirmation =
+      backend.warnings.length > 0
+        ? backend.warnings.join(" · ")
+        : "Backend IQTF confirmation is currently sufficient"
+
+    return {
+      bias,
+      action,
+      readiness,
+      confidence: backend.confidence,
+      risk: backend.riskState,
+      reason,
+      confirmation,
+      constraint:
+        backend.riskState === "HIGH"
+          ? "Do not initiate new exposure while volatility risk is HIGH"
+          : readiness === "CONFIRMED"
+            ? "Execute only after the defined market trigger"
+            : "No execution without additional confirmation",
+      factors: buildIntelligenceDecision(data).factors,
+      conflicts: buildIntelligenceDecision(data).conflicts,
     }
   }
 
@@ -407,7 +467,8 @@ function getActionContext(
   riskPosition: ReturnType<typeof getRiskPositionContext>,
   tradePlan: ReturnType<typeof getTradePlan>,
   monitoring: ReturnType<typeof getMonitoringContext>,
-  alert: ReturnType<typeof getAlertContext>
+  alert: ReturnType<typeof getAlertContext>,
+  iqtf: CmeAnalysis["iqtfDecision"] | null
 ) {
   if (!data) {
     return {
@@ -425,63 +486,51 @@ function getActionContext(
   let nextStep = "Continue monitoring current market state"
   let constraint = "No execution without confirmation"
 
-  if (alert.level === "HIGH") {
-    action = "PROTECT"
-    state = "RISK CONTROL"
-    priority = "HIGH"
-    nextStep = alert.action
-    constraint = "Do not initiate new exposure while risk is elevated"
-  } else if (
-    tradePlan.direction === "LONG" &&
-    tradePlan.planStatus === "READY"
-  ) {
-    action = "PREPARE LONG"
-    state = "EXECUTION READY"
-    priority = "HIGH"
-    nextStep = "Wait for the defined long trigger before execution"
-    constraint = "Execute only after trigger confirmation"
-  } else if (
-    tradePlan.direction === "SHORT" &&
-    tradePlan.planStatus === "READY"
-  ) {
-    action = "PREPARE SHORT"
-    state = "EXECUTION READY"
-    priority = "HIGH"
-    nextStep = "Wait for the defined short trigger before execution"
-    constraint = "Execute only after trigger confirmation"
-  } else if (
-    monitoring.confirmation === "DEVELOPING"
-  ) {
-    action = "WAIT FOR CONFIRMATION"
-    state = "DEVELOPING"
-    priority = "MEDIUM"
-    nextStep = monitoring.watch
-    constraint = "Do not execute while directional confirmation is incomplete"
-  } else if (
-    monitoring.scenario === "BULLISH"
-  ) {
-    action = "WATCH LONG"
-    state = "WATCH"
-    priority = "MEDIUM"
-    nextStep = "Monitor bullish continuation and momentum confirmation"
-    constraint = "No long execution without confirmation"
-  } else if (
-    monitoring.scenario === "BEARISH"
-  ) {
-    action = "WATCH SHORT"
-    state = "WATCH"
-    priority = "MEDIUM"
-    nextStep = "Monitor bearish continuation and momentum confirmation"
-    constraint = "No short execution without confirmation"
-  } else if (
-    decision.action !== "WAIT"
-  ) {
-    action = "MONITOR BIAS"
-    state = "BIAS ACTIVE"
-    priority = "LOW"
-    nextStep = "Monitor for alignment between decision and market confirmation"
-    constraint = "Maintain conditional execution only"
+if (alert.level === "HIGH") {
+  action = "PROTECT"
+  state = "RISK CONTROL"
+  priority = "HIGH"
+  nextStep = alert.action
+  constraint = "Do not initiate new exposure while risk is elevated"
+} else if (iqtf?.decision === "LONG") {
+  action = "PREPARE LONG"
+  state = "IQTF LONG"
+  priority = iqtf.riskState === "HIGH" ? "HIGH" : "MEDIUM"
+  nextStep = "Wait for the defined long trigger before execution"
+  constraint =
+    iqtf.riskState === "HIGH"
+      ? "Do not execute while IQTF risk is HIGH"
+      : "Execute only after trigger confirmation"
+} else if (iqtf?.decision === "SHORT") {
+  action = "PREPARE SHORT"
+  state = "IQTF SHORT"
+  priority = iqtf.riskState === "HIGH" ? "HIGH" : "MEDIUM"
+  nextStep = "Wait for the defined short trigger before execution"
+  constraint =
+    iqtf.riskState === "HIGH"
+      ? "Do not execute while IQTF risk is HIGH"
+      : "Execute only after trigger confirmation"
+} else if (iqtf?.decision === "LONG_WATCH") {
+  action = "WATCH LONG"
+  state = "IQTF WATCH"
+  priority = "MEDIUM"
+  nextStep = "Monitor bullish confirmation before execution"
+  constraint = "No long execution without confirmation"
+} else if (iqtf?.decision === "SHORT_WATCH") {
+  action = "WATCH SHORT"
+  state = "IQTF WATCH"
+  priority = "MEDIUM"
+  nextStep = "Monitor bearish confirmation before execution"
+  constraint = "No short execution without confirmation"
+} else if (iqtf?.decision === "NO_TRADE") {
+  action = "WAIT"
+  state = "NO TRADE"
+  priority = "LOW"
+  nextStep = "Wait for stronger directional evidence"
+  constraint = "No directional execution"
   }
+
+
 
   return {
     action,
@@ -542,7 +591,8 @@ function getExecutiveSummary(
     monitoring.confirmation === "CONFIRMED"
   ) {
     verdict = "SHORT SCENARIO — WAIT FOR TRIGGER"
-  } else if (alert.level === "HIGH") {
+  } else 
+if (alert.level === "HIGH") {
     verdict = "RISK ELEVATED — PROTECT CAPITAL"
   } else if (bias === "BULLISH") {
     verdict = "BULLISH BIAS — CONFIRM MOMENTUM"
@@ -577,8 +627,7 @@ function getExecutiveSummary(
   }
 
   return {
-    regime: monitoring.regime,
-    bias,
+    regime: monitoring.regime,    bias,
     risk,
     action: actionContext.action,
     verdict,
@@ -695,7 +744,8 @@ function getSignalConfidence(
     weakness = "Risk conditions require protection"
   } else if (monitoring.scenario === "NEUTRAL") {
     weakness = "No clear directional scenario is active"
-  } else if (alert.level === "HIGH") {
+  } else 
+if (alert.level === "HIGH") {
     weakness = "Active alert conditions reduce decision quality"
   }
 
@@ -788,7 +838,10 @@ export default function AIAnalysisPage() {
       ? "bg-red-500/10"
       : "bg-zinc-500/10"
 
-  const decision = getDecision(data)
+  const decision = getDecision(data, cmeData)
+
+const iqtf = cmeData?.iqtfDecision ?? null
+
 
   const decisionColor =
     decision.bias === "BULLISH"
@@ -872,7 +925,8 @@ export default function AIAnalysisPage() {
     riskPosition,
     tradePlan,
     monitoring,
-    alert
+    alert,
+    iqtf
   )
 
   const actionColor =
@@ -1231,9 +1285,11 @@ export default function AIAnalysisPage() {
               Risk State
             </p>
 
-            <p className={`mt-2 text-xl font-bold ${riskColor}`}>
-              {decision.risk}
-            </p>
+
+
+        <p className={`mt-2 text-xl font-bold ${decisionColor}`}>
+          {iqtf?.decision ?? decision.action}
+           </p>
           </div>
 
           <div className="rounded-lg bg-zinc-900 p-4">
@@ -1258,6 +1314,80 @@ export default function AIAnalysisPage() {
           </div>
         )}
       </div>
+
+{/* IQTF Decision Breakdown */}
+{iqtf && (
+  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+    <div className="flex items-center gap-3">
+      <Activity className="text-sky-400" />
+
+      <div>
+        <h2 className="text-lg font-semibold text-white">
+          IQTF Decision Breakdown
+        </h2>
+        <p className="text-xs text-zinc-500">
+          Composite decision from Market, CME and Vol2Vol evidence
+        </p>
+      </div>
+    </div>
+
+    <div className="mt-5 grid gap-4 md:grid-cols-4">
+      <div className="rounded-lg bg-zinc-900 p-4">
+        <p className="text-xs text-zinc-500">Composite Score</p>
+        <p className="mt-2 text-xl font-bold text-white">
+          {iqtf.compositeScore.toFixed(3)}
+        </p>
+      </div>
+
+      <div className="rounded-lg bg-zinc-900 p-4">
+        <p className="text-xs text-zinc-500">Market</p>
+        <p className="mt-2 text-xl font-bold text-white">
+          {iqtf.components.market.toFixed(3)}
+        </p>
+      </div>
+
+      <div className="rounded-lg bg-zinc-900 p-4">
+        <p className="text-xs text-zinc-500">CME</p>
+        <p className="mt-2 text-xl font-bold text-white">
+          {iqtf.components.cme.toFixed(3)}
+        </p>
+      </div>
+
+      <div className="rounded-lg bg-zinc-900 p-4">
+        <p className="text-xs text-zinc-500">Vol2Vol</p>
+        <p className="mt-2 text-xl font-bold text-white">
+          {iqtf.components.vol2vol.toFixed(3)}
+        </p>
+      </div>
+    </div>
+
+    {iqtf.reasons.length > 0 && (
+      <div className="mt-4 rounded-lg border border-white/5 bg-white/[0.02] p-4">
+        <p className="text-xs font-semibold text-white">Evidence</p>
+
+        <div className="mt-2 space-y-1 text-sm text-zinc-400">
+          {iqtf.reasons.map((reason, index) => (
+            <p key={index}>• {reason}</p>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {iqtf.warnings.length > 0 && (
+      <div className="mt-4 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
+        <p className="text-xs font-semibold text-yellow-400">
+          Warnings
+        </p>
+
+        <div className="mt-2 space-y-1 text-sm text-yellow-300/80">
+          {iqtf.warnings.map((warning, index) => (
+            <p key={index}>• {warning}</p>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+)}
 
       {/* Executive Risk & Position Context */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
@@ -1513,6 +1643,7 @@ export default function AIAnalysisPage() {
 
                 <p className="mt-1 text-sm text-zinc-300">
                   {institutionalData?.vol2vol.reasons.join(" · ") ?? cmeData.vol2vol.reasons.join(" · ")}
+                   </p>
               <div className="mt-3 rounded-lg border border-emerald-500/10 bg-emerald-500/[0.03] p-3">
                 <p className="text-xs uppercase tracking-wider text-emerald-400">
                   COT Institutional Positioning
@@ -1536,18 +1667,19 @@ export default function AIAnalysisPage() {
                       {institutionalData?.cot.intelligence.swapDealerNet.toLocaleString()}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-xs text-zinc-500">Positioning</p>
+                                 <div>
+                    <p className="text-xs text-zinc-500">
+                      Positioning
+                    </p>
                     <p className="mt-1 text-sm font-bold text-emerald-400">
                       {institutionalData?.cot.intelligence.positioning}
                     </p>
                   </div>
                 </div>
               </div>
-                </p>
-              </div>
-            </>
-          ) : (
+            </div>
+          </>
+        ) : (  
             <div className="mt-4 rounded-lg bg-zinc-900 p-4 text-sm text-zinc-500">
               Waiting for CME GC institutional flow data...
             </div>

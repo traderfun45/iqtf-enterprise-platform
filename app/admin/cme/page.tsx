@@ -16,6 +16,8 @@ type CmeData = {
   oiZscore?: number
   source?: string
   note?: string
+inputMethod?: 'MANUAL' | 'OCR' | 'CME_API'
+  imageReference?: string
 }
 
 type CmeAnalysis = {
@@ -66,6 +68,30 @@ export default function CmeAdminPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [analysis, setAnalysis] = useState<CmeAnalysis | null>(null)
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+
+  function handleImageSelect(file: File | null) {
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    setMessage('Please select an image file')
+    return
+  }
+
+  setSelectedImage(file)
+
+  const previewUrl = URL.createObjectURL(file)
+  setImagePreview(previewUrl)
+
+  setForm((current) => ({
+    ...current,
+    inputMethod: 'OCR',
+    imageReference: file.name,
+  }))
+
+  setMessage(`Image selected: ${file.name}`)
+}
 
   async function loadAnalysis() {
     try {
@@ -333,6 +359,45 @@ export default function CmeAdminPage() {
                 className="min-h-24 w-full rounded-md border bg-transparent p-2"
               />
             </label>
+
+<div className="md:col-span-2 rounded-lg border p-4">
+  <h3 className="font-semibold">
+    Scan CME Screenshot
+  </h3>
+
+  <p className="mt-1 text-sm opacity-60">
+    Select a CME screenshot for OCR
+  </p>
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(event) =>
+      handleImageSelect(event.target.files?.[0] ?? null)
+    }
+    className="mt-3 w-full rounded-md border p-2"
+  />
+
+  {selectedImage && (
+    <div className="mt-4 space-y-3">
+      <div className="text-sm">
+        Selected: <strong>{selectedImage.name}</strong>
+      </div>
+
+      {imagePreview && (
+        <img
+          src={imagePreview}
+          alt="CME screenshot preview"
+          className="max-h-96 rounded-lg border object-contain"
+        />
+      )}
+
+      <div className="text-xs opacity-60">
+        Input Method: {form.inputMethod ?? 'MANUAL'}
+      </div>
+    </div>
+  )}
+</div>
 
             <div className="md:col-span-2">
               <button

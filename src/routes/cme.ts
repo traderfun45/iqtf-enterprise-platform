@@ -1,3 +1,10 @@
+import { runCmeOcr } from '../services/cmeOcr.js'
+
+import { analyzeCmeImage } from '../services/openaiVision.js'
+import { normalizeCmeVision } from '../services/cmeVisionNormalizer.js'
+import { validateCmeVision } from '../services/cmeVisionValidator.js'
+import { analyzeCmeOptionIntelligence } from '../services/cmeOptionIntelligence.js'
+import fs from "node:fs/promises"
 import type { FastifyInstance } from 'fastify'
 
 import {
@@ -12,6 +19,11 @@ import {
 } from '../services/cmeIntelligence.js'
 import { resolveVol2VolState } from '../services/vol2volState.js'
 import { analyzeVol2Vol } from '../services/vol2vol.js'
+import { getMarketProvider } from '../providers/market/index.js'
+import { getMarketBySymbol } from '../db/markets.js'
+import { calculateMarketIntelligence } from '../services/market/intelligence.js'
+import { getCachedMarketIntelligence } from '../services/market/intelligenceCache.js'
+import { calculateIqtfDecision } from '../services/iqtfDecision.js'
 import {
   getVol2VolState,
   saveVol2VolState,
@@ -22,7 +34,6 @@ function buildHistoricalChanges(
 ) {
   const historicalVolumeChanges: number[] = []
   const historicalOIChanges: number[] = []
-
   for (
     let i = 1;
     i < history.length;
@@ -61,7 +72,63 @@ function buildHistoricalChanges(
 
 export async function cmeRoutes(
   app: FastifyInstance,
-) {
+) {  // =========================================================
+  // POST /api/cme/ocr
+  // =========================================================
+  app.post('/api/cme/ocr', async (request, reply) => {
+    const body = request.body as {
+      image?: string
+    }
+
+    if (!body?.image) {
+      return reply.code(400).send({
+        error: 'image is required',
+      })
+    }
+
+    try {
+      const imageBuffer = Buffer.from(body.image, 'base64')
+
+        const tempPath = `./cme-ocr-${Date.now()}.jpg`
+
+await fs.writeFile(tempPath, imageBuffer)
+
+try {
+  const visionResult = await analyzeCmeImage(tempPath)
+console.log(
+  'CME RAW VISION:',
+  JSON.stringify(visionResult, null, 2)
+)
+  const normalizedResult = normalizeCmeVision(visionResult)
+  const validation = validateCmeVision(normalizedResult)
+
+    const optionIntelligence =
+      analyzeCmeOptionIntelligence(
+        normalizedResult.optionRows,
+      )
+
+  return {
+    success: true,
+    data: normalizedResult,
+      optionIntelligence,
+    validation,
+  }
+} finally {
+
+  await fs.unlink(tempPath).catch(() => {})
+}
+     
+
+     
+        
+    } catch (error) {
+      console.error('CME OCR ERROR FULL:', JSON.stringify(error, null, 2)); console.error(error)
+
+      return reply.code(500).send({
+        error: 'OCR processing failed',
+      })
+    }
+  })
 
   // =========================================================
   // POST /api/cme
@@ -328,6 +395,47 @@ const vol2volState =
             vol2vol.confidence,
         })
 
+        const marketIntelligence =
+          await getCachedMarketIntelligence(
+            `${symbol}:1h:50`,
+            async () => {
+              const market = getMarketBySymbol(symbol)
+
+              if (!market) {
+                throw new Error(`Market symbol not found: ${symbol}`)
+              }
+
+              const provider =
+                getMarketProvider(market.provider ?? 'mock')
+
+              if (typeof provider.getHistory !== 'function') {
+                throw new Error(
+                  `Historical data is not supported for ${symbol}`,
+                )
+              }
+
+              const candles = await provider.getHistory(symbol, {
+                interval: '1h',
+                outputsize: 50,
+              })
+
+              return {
+                intelligence: calculateMarketIntelligence(candles),
+                candleCount: candles.length,
+              }
+            },
+          )
+
+        const iqtfDecision =
+          calculateIqtfDecision({
+            marketScore:
+              marketIntelligence.intelligence.score,
+            cmeConfirmation:
+              intelligence.confirmationScore,
+            vol2volScore:
+              vol2vol.score,
+          })
+
       return {
         success: true,
 
@@ -335,9 +443,14 @@ const vol2volState =
 
         data: latest,
 
-        intelligence,
+          marketIntelligence:
+            marketIntelligence.intelligence,
 
-        vol2vol,
+          intelligence,
+
+          vol2vol,
+
+          iqtfDecision,
 
         vol2volState,
 

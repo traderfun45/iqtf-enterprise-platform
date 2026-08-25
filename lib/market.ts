@@ -72,7 +72,7 @@ export type Intelligence = {
 export async function getMarketSnapshot(): Promise<MarketSnapshot> {
   return apiGet<MarketSnapshot>(
     "/api/market/snapshot",
-    5000
+    15000
   )
 }
 
@@ -135,6 +135,25 @@ export type CmeAnalysis = {
     oiDirection: string
     positioning: string
     reasons: string[]
+  }
+
+  iqtfDecision: {
+    compositeScore: number
+    decision:
+      | "LONG"
+      | "LONG_WATCH"
+      | "NO_TRADE"
+      | "SHORT_WATCH"
+      | "SHORT"
+    confidence: number
+    riskState: "LOW" | "NORMAL" | "ELEVATED" | "HIGH"
+    components: {
+      market: number
+      cme: number
+      vol2vol: number
+    }
+    reasons: string[]
+    warnings: string[]
   }
 
   vol2volState: {
@@ -231,6 +250,47 @@ export type InstitutionalAnalysis = {
       source: string
       note?: string
     }
+  }
+
+  iqtfDecision: {
+    compositeScore: number
+    decision:
+      | "LONG"
+      | "LONG_WATCH"
+      | "NO_TRADE"
+      | "SHORT_WATCH"
+      | "SHORT"
+    confidence: number
+    riskState: "LOW" | "NORMAL" | "ELEVATED" | "HIGH"
+    components: {
+      market: number
+      cme: number
+      vol2vol: number
+      cot: number
+    }
+    reasons: string[]
+    warnings: string[]
+  }
+
+  summary: {
+    decision:
+      | "LONG"
+      | "LONG_WATCH"
+      | "NO_TRADE"
+      | "SHORT_WATCH"
+      | "SHORT"
+    confidence: number
+    riskState: "LOW" | "NORMAL" | "ELEVATED" | "HIGH"
+    compositeScore: number
+    institutionalAlignment: "BULLISH" | "BEARISH" | "NEUTRAL"
+    components: {
+      market: number
+      cme: number
+      vol2vol: number
+      cot: number
+    }
+    reasons: string[]
+    warnings: string[]
   }
 
   historyStats: {

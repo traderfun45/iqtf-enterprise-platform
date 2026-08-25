@@ -60,6 +60,27 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS cme_vol2vol_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    data_date TEXT NOT NULL,
+    data_time TEXT,
+    future_settlement REAL,
+    volatility_settlement REAL,
+    put_volume INTEGER,
+    call_volume INTEGER,
+    expected_range_low REAL,
+    expected_range_high REAL,
+    expected_range_raw TEXT,
+    source TEXT NOT NULL DEFAULT 'CME',
+    note TEXT,
+    raw_ocr TEXT,
+    image_reference TEXT,
+    input_method TEXT NOT NULL DEFAULT 'OCR',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS vol2vol_state (
     symbol TEXT PRIMARY KEY,
     state TEXT NOT NULL DEFAULT 'NO_POSITION',
