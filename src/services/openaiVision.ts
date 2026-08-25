@@ -2,13 +2,23 @@ import "dotenv/config"
 import OpenAI from "openai"
 import fs from "node:fs/promises"
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-  defaultHeaders: {
-    "x-goog-api-client": "iqtf-enterprise/1.0",
-  },
-})
+function getOpenRouterClient() {
+  const apiKey = process.env.OPENAI_API_KEY
+
+  if (!apiKey) {
+    throw new Error(
+      "OPENAI_API_KEY is not configured; CME Vision is unavailable",
+    )
+  }
+
+  return new OpenAI({
+    apiKey,
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+      "x-goog-api-client": "iqtf-enterprise/1.0",
+    },
+  })
+}
 
 export async function analyzeCmeImage(imagePath: string) {
   const imageBuffer = await fs.readFile(imagePath)
@@ -16,8 +26,7 @@ export async function analyzeCmeImage(imagePath: string) {
 
   let response
   try {
-    response = await client.chat.completions.create({
-    model: "google/gemini-2.5-flash",
+response = await getOpenRouterClient().chat.completions.create({    model: "google/gemini-2.5-flash",
     max_tokens: 2200,
 
     response_format: {
