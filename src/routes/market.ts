@@ -20,47 +20,71 @@ export async function marketRoutes(app: FastifyInstance) {
       timestamp: new Date().toISOString()
     }
   })
+
 app.get('/api/market/snapshot', async (request) => {
   const markets = listMarkets()
 
   const data = await Promise.all(
     markets.map(async (market) => {
+      const startedAt = Date.now()
+
       try {
-        const provider = getMarketProvider(market.provider ?? 'mock')
-        const quote = await getCachedMarketQuote(market.provider ?? "mock", market.symbol, provider)
+        const provider = getMarketProvider(
+          market.provider ?? 'mock'
+        )
+
+        const quote = await getCachedMarketQuote(
+          market.provider ?? 'mock',
+          market.symbol,
+          provider
+        )
+
+        request.log.info(
+          {
+            symbol: market.symbol,
+            provider: market.provider ?? 'mock',
+            elapsedMs: Date.now() - startedAt,
+          },
+          'MARKET QUOTE TIMING',
+        )
 
         return {
           ...quote,
-          status: 'ok'
+          status: 'ok',
         }
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : 'Market provider error'
+          error instanceof Error
+            ? error.message
+            : 'Market provider error'
 
         request.log.warn(
           {
             symbol: market.symbol,
-            provider: market.provider,
-            error: message
+            provider: market.provider ?? 'mock',
+            elapsedMs: Date.now() - startedAt,
+            error: message,
           },
-          'Market snapshot quote unavailable'
+          'MARKET QUOTE FAILED',
         )
 
         return {
           symbol: market.symbol,
           status: 'unavailable',
           source: market.provider ?? 'unknown',
-          error: message
+          error: message,
         }
       }
-    })
+    }),
   )
 
   return {
     data,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   }
 })
+
+
   app.get('/api/market/quote', async (request, reply) => {
     const { symbol = 'XAUUSD' } = request.query as {
       symbol?: string
