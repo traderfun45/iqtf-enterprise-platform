@@ -76,11 +76,19 @@ export class CmeMarketProvider implements MarketProvider {
     const period2 = new Date();
     const period1 = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const chart = await yahooFinance.chart("GC=F", {
-      period1,
-      period2,
-      interval: "5m",
-    });
+    const chart = await Promise.race([
+      yahooFinance.chart("GC=F", {
+        period1,
+        period2,
+        interval: "5m",
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Yahoo Finance GC quote timeout")),
+          8000,
+        ),
+      ),
+    ]);
 
     const price = chart.meta?.regularMarketPrice;
 
@@ -137,11 +145,19 @@ export class CmeMarketProvider implements MarketProvider {
       throw new Error("Invalid startDate or endDate");
     }
 
-    const chart = await yahooFinance.chart("GC=F", {
-      period1,
-      period2,
-      interval: range.interval,
-    });
+    const chart = await Promise.race([
+      yahooFinance.chart("GC=F", {
+        period1,
+        period2,
+        interval: range.interval,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Yahoo Finance GC history timeout")),
+          8000,
+        ),
+      ),
+    ]);
 
     const quotes = chart.quotes
       .filter(
