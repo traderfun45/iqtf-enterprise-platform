@@ -13,13 +13,14 @@ import {
 
 import {
   getMarketIntelligence,
+  getMarketQuote,
   getCmeAnalysis,
   getInstitutionalAnalysis,
   type Intelligence,
   type CmeAnalysis,
   type InstitutionalAnalysis,
+  type Quote,
 } from "@/lib/market"
-
 import {
   buildIntelligenceDecision,
   type IntelligenceDecision,
@@ -764,13 +765,15 @@ if (alert.level === "HIGH") {
 
 export default function AIAnalysisPage() {
 
+const [data, setData] = useState<Intelligence | null>(null)
+const [quote, setQuote] = useState<Quote | null>(null)
+const [cmeData, setCmeData] = useState<CmeAnalysis | null>(null)
+const [institutionalData, setInstitutionalData] =
+  useState<InstitutionalAnalysis | null>(null)
+const [loading, setLoading] = useState(true)
+const [refreshing, setRefreshing] = useState(false)
+const [error, setError] = useState<string | null>(null)
 
-  const [data, setData] = useState<Intelligence | null>(null)
-  const [cmeData, setCmeData] = useState<CmeAnalysis | null>(null)
-  const [institutionalData, setInstitutionalData] = useState<InstitutionalAnalysis | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function loadIntelligence(isInitialLoad = false) {
     try {
@@ -782,16 +785,15 @@ export default function AIAnalysisPage() {
 
       setError(null)
 
-      const [result, cmeResult, institutionalResult] = await Promise.all([
-        getMarketIntelligence(
-          "XAUUSD",
-          "1h",
-          50
-        ),
-        getCmeAnalysis("GC"),
-        getInstitutionalAnalysis("GC"),
-      ])
+const [quoteResult, result, cmeResult, institutionalResult] =
+  await Promise.all([
+    getMarketQuote("XAUUSD"),
+    getMarketIntelligence("XAUUSD", "1h", 50),
+    getCmeAnalysis("GC"),
+    getInstitutionalAnalysis("GC"),
+  ])
 
+setQuote(quoteResult)
       setData(result)
       setCmeData(cmeResult)
       setInstitutionalData(institutionalResult)
@@ -1161,13 +1163,33 @@ const iqtf = cmeData?.iqtfDecision ?? null
             </div>
           </div>
         </div>
+       
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+  <p className="text-xs text-zinc-500">XAUUSD PRICE</p>
+  <p className="mt-2 text-3xl font-bold text-white">
+    {quote ? quote.price.toFixed(2) : "—"}
+  </p>
+  <p className="mt-1 text-xs text-zinc-500">
+    {quote?.source ?? "LIVE MARKET"}
+  </p>
+</div>
 
         {/* Signal */}
         <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
           <h2 className="text-lg font-semibold text-white">
             Executive Signal
           </h2>
+<div className="flex justify-between">
+  <span className="text-zinc-500">
+    XAUUSD Price
+  </span>
 
+  <span className="text-xl font-bold text-white">
+    {quote?.price != null
+      ? quote.price.toFixed(2)
+      : "—"}
+  </span>
+</div>
           <div
             className={`mt-6 rounded-xl ${signalBg} p-6 text-center`}
           >
@@ -1366,7 +1388,7 @@ const iqtf = cmeData?.iqtfDecision ?? null
         <p className="text-xs font-semibold text-white">Evidence</p>
 
         <div className="mt-2 space-y-1 text-sm text-zinc-400">
-          {iqtf.reasons.map((reason, index) => (
+           {iqtf.reasons.map((reason: string, index: number) => (
             <p key={index}>• {reason}</p>
           ))}
         </div>
@@ -1380,7 +1402,8 @@ const iqtf = cmeData?.iqtfDecision ?? null
         </p>
 
         <div className="mt-2 space-y-1 text-sm text-yellow-300/80">
-          {iqtf.warnings.map((warning, index) => (
+
+           {iqtf.warnings.map((warning: string, index: number) => (         
             <p key={index}>• {warning}</p>
           ))}
         </div>
