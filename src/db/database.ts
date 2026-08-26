@@ -1,7 +1,9 @@
 import { DatabaseSync } from 'node:sqlite'
 import path from 'node:path'
 
-const dbPath = path.resolve(process.cwd(), 'iqtf.db')
+const dbPath = process.env.DB_PATH
+  ? process.env.DB_PATH
+  : path.resolve(process.cwd(), 'iqtf.db')
 
 export const db = new DatabaseSync(dbPath)
 

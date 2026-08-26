@@ -22,9 +22,12 @@ export async function marketRoutes(app: FastifyInstance) {
   })
 
 app.get('/api/market/snapshot', async (request) => {
+  const snapshotStartedAt = Date.now()
+
   const markets = listMarkets()
 
   const data = await Promise.all(
+
     markets.map(async (market) => {
       const startedAt = Date.now()
 
@@ -78,12 +81,19 @@ app.get('/api/market/snapshot', async (request) => {
     }),
   )
 
+  request.log.info(
+    {
+      elapsedMs: Date.now() - snapshotStartedAt,
+      marketCount: markets.length,
+    },
+    'MARKET SNAPSHOT TIMING',
+  )
+
   return {
     data,
     timestamp: new Date().toISOString(),
   }
 })
-
 
   app.get('/api/market/quote', async (request, reply) => {
     const { symbol = 'XAUUSD' } = request.query as {
