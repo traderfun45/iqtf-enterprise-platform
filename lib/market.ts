@@ -309,3 +309,11 @@ export async function getInstitutionalAnalysis(
     10000
   )
 }
+export async function getMarketQuote(
+  symbol = "XAUUSD"
+): Promise<Quote> {
+  return apiGet<Quote>(
+    `/api/market/quote?symbol=${encodeURIComponent(symbol)}`,
+    10000
+  )
+}
