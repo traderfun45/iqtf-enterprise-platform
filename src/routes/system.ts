@@ -1,56 +1,60 @@
 import type { FastifyInstance } from 'fastify'
 import os from 'node:os'
 import fs from 'node:fs'
-import { db } from '../db/database.js'
 
 const startedAt = Date.now()
+
+function testWritable(dir: string) {
+  try {
+    fs.mkdirSync(dir, { recursive: true })
+
+    const testFile = `${dir}/.iqtf-write-test-${process.pid}`
+
+    fs.writeFileSync(testFile, 'ok')
+    fs.unlinkSync(testFile)
+
+    return true
+  } catch {
+    return false
+  }
+}
 
 export async function systemRoutes(app: FastifyInstance) {
   app.get('/api/system/status', async () => {
     const memory = process.memoryUsage()
     const cpu = process.cpuUsage()
 
-    const dbPath = process.env.DB_PATH ?? null
+    const candidates = [
+      process.env.DB_PATH
+        ? { path: process.env.DB_PATH, source: 'DB_PATH' }
+        : null,
+      { path: '/data/iqtf.db', source: 'render-disk' },
+      { path: '/tmp/iqtf.db', source: 'tmp' },
+      {
+        path: `${process.cwd()}/iqtf.db`,
+        source: 'cwd',
+      },
+    ].filter(Boolean) as {
+      path: string
+      source: string
+    }[]
 
-    const dbFileExists = (() => {
-      try {
-        return dbPath ? fs.existsSync(dbPath) : false
-      } catch {
-        return false
+    const filesystem = candidates.map((candidate) => {
+      const dir = candidate.path.substring(
+        0,
+        candidate.path.lastIndexOf('/'),
+      )
+
+      return {
+        ...candidate,
+        directory: dir,
+        writable: testWritable(dir),
+        exists: fs.existsSync(candidate.path),
+        size: fs.existsSync(candidate.path)
+          ? fs.statSync(candidate.path).size
+          : null,
       }
-    })()
-
-    const dbFileSize = (() => {
-      try {
-        return dbPath ? fs.statSync(dbPath).size : null
-      } catch {
-        return null
-      }
-    })()
-
-    const databaseConnected = (() => {
-      try {
-        db.prepare('SELECT 1').get()
-        return true
-      } catch {
-        return false
-      }
-    })()
-
-    const cmeCount = (() => {
-      try {
-        const row = db
-          .prepare(`
-            SELECT COUNT(*) AS count
-            FROM cme_market_data
-          `)
-          .get() as { count: number }
-
-        return Number(row.count)
-      } catch {
-        return null
-      }
-    })()
+    })
 
     return {
       service: 'iqtf-enterprise',
@@ -94,11 +98,8 @@ export async function systemRoutes(app: FastifyInstance) {
       },
 
       database: {
-        connected: databaseConnected,
-        cmeCount,
-        dbPath,
-        dbFileExists,
-        dbFileSize,
+        configuredPath: process.env.DB_PATH ?? null,
+        filesystem,
       },
 
       timestamp: new Date().toISOString(),
