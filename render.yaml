@@ -9,9 +9,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: DB_PATH
-        value: /data/iqtf.db
+        value: /var/data/iqtf.db
 
     disk:
       name: iqtf-enterprise-data
-      mountPath: /data
+      mountPath: /var/data
       sizeGB: 1
