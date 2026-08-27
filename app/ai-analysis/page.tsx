@@ -785,19 +785,41 @@ const [error, setError] = useState<string | null>(null)
 
       setError(null)
 
-const [quoteResult, result, cmeResult, institutionalResult] =
-  await Promise.all([
-    getMarketQuote("XAUUSD"),
-    getMarketIntelligence("XAUUSD", "1h", 50),
-    getCmeAnalysis("GC"),
-    getInstitutionalAnalysis("GC"),
-  ])
+const [
+        quoteResult,
+        intelligenceResult,
+        cmeResult,
+        institutionalResult,
+      ] = await Promise.allSettled([
+        getMarketQuote("XAUUSD"),
+        getMarketIntelligence("XAUUSD", "1h", 50),
+        getCmeAnalysis("GC"),
+        getInstitutionalAnalysis("GC"),
+      ])
 
-setQuote(quoteResult)
-      setData(result)
-      setCmeData(cmeResult)
-      setInstitutionalData(institutionalResult)
-    } catch (err) {
+      if (quoteResult.status === "fulfilled") {
+        setQuote(quoteResult.value)
+      }
+
+      if (intelligenceResult.status === "fulfilled") {
+        setData(intelligenceResult.value)
+      } else {
+        throw intelligenceResult.reason
+      }
+
+      if (cmeResult.status === "fulfilled") {
+        setCmeData(cmeResult.value)
+      } else {
+        setCmeData(null)
+      }
+
+      if (institutionalResult.status === "fulfilled") {
+        setInstitutionalData(institutionalResult.value)
+      } else {
+        setInstitutionalData(null)
+      }
+
+      } catch (err) {
       setError(
         err instanceof Error
           ? err.message
