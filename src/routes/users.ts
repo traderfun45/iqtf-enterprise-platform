@@ -1,16 +1,17 @@
 import type { FastifyInstance } from 'fastify'
 import { db } from '../db/database.js'
+import { hashPassword } from '../utils/password.js'
 
 export async function userRoutes(app: FastifyInstance) {
   app.get('/users', async () => {
     const users = db
       .prepare(
-        'SELECT id, email, name, created_at FROM users ORDER BY id DESC'
+        'SELECT id, email, name, role, created_at FROM users ORDER BY id DESC',
       )
       .all()
 
     return {
-      data: users
+      data: users,
     }
   })
 
@@ -20,24 +21,24 @@ export async function userRoutes(app: FastifyInstance) {
 
     if (!Number.isInteger(userId) || userId <= 0) {
       return reply.code(400).send({
-        error: 'Invalid user id'
+        error: 'Invalid user id',
       })
     }
 
     const user = db
       .prepare(
-        'SELECT id, email, name, created_at FROM users WHERE id = ?'
+        'SELECT id, email, name, role, created_at FROM users WHERE id = ?',
       )
       .get(userId)
 
     if (!user) {
       return reply.code(404).send({
-        error: 'User not found'
+        error: 'User not found',
       })
     }
 
     return {
-      data: user
+      data: user,
     }
   })
 
@@ -45,41 +46,75 @@ export async function userRoutes(app: FastifyInstance) {
     const body = request.body as {
       email?: string
       name?: string
+      password?: string
     }
 
     if (!body?.email || typeof body.email !== 'string') {
       return reply.code(400).send({
-        error: 'email is required'
+        error: 'email is required',
+      })
+    }
+
+    if (!body?.password || typeof body.password !== 'string') {
+      return reply.code(400).send({
+        error: 'password is required',
       })
     }
 
     const email = body.email.trim()
+
     const name =
       typeof body.name === 'string' && body.name.trim()
         ? body.name.trim()
         : null
 
+    const password = body.password
+
     if (!email) {
       return reply.code(400).send({
-        error: 'email is required'
+        error: 'email is required',
+      })
+    }
+
+    if (password.length < 8) {
+      return reply.code(400).send({
+        error: 'password must be at least 8 characters',
       })
     }
 
     try {
+      const passwordHash = await hashPassword(password)
+
       const result = db
         .prepare(
-          'INSERT INTO users (email, name) VALUES (?, ?)'
+          `
+          INSERT INTO users (
+            email,
+            name,
+            password_hash
+          )
+          VALUES (?, ?, ?)
+          `,
         )
-        .run(email, name)
+        .run(email, name, passwordHash)
 
       const user = db
         .prepare(
-          'SELECT id, email, name, created_at FROM users WHERE id = ?'
+          `
+          SELECT
+            id,
+            email,
+            name,
+            role,
+            created_at
+          FROM users
+          WHERE id = ?
+          `,
         )
         .get(Number(result.lastInsertRowid))
 
       return reply.code(201).send({
-        data: user
+        data: user,
       })
     } catch (error) {
       if (
@@ -87,7 +122,7 @@ export async function userRoutes(app: FastifyInstance) {
         error.message.includes('UNIQUE constraint failed')
       ) {
         return reply.code(409).send({
-          error: 'Email already exists'
+          error: 'Email already exists',
         })
       }
 

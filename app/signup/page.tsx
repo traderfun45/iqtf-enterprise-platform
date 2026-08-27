@@ -20,6 +20,8 @@ type CreateUserResponse = {
 export default function SignupPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState("")
@@ -38,17 +40,30 @@ export default function SignupPage() {
       return
     }
 
+    if (password.length < 8) {
+      setError("Password ต้องมีอย่างน้อย 8 ตัวอักษร")
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError("Password และ Confirm Password ไม่ตรงกัน")
+      return
+    }
+
     setLoading(true)
 
     try {
       await apiPost<CreateUserResponse>("/users", {
         email: cleanEmail,
         name: cleanName || undefined,
+        password,
       })
 
       setSuccess(true)
       setName("")
       setEmail("")
+      setPassword("")
+      setConfirmPassword("")
     } catch (err) {
       setError(
         err instanceof Error
@@ -124,6 +139,48 @@ export default function SignupPage() {
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   placeholder="Your name"
+                  className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-white/30"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="password"
+                  className="text-sm text-zinc-300"
+                >
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="อย่างน้อย 8 ตัวอักษร"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-white/30"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="confirmPassword"
+                  className="text-sm text-zinc-300"
+                >
+                  Confirm Password
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  placeholder="กรอก Password อีกครั้ง"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
                   className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-white/30"
                   disabled={loading}
                 />
