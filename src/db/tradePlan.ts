@@ -160,9 +160,13 @@ export function updateTradePlan(
     throw new Error('Trade plan not found')
   }
 
+  const patch: Partial<TradePlan> = Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  ) as Partial<TradePlan>
+
   const next: TradePlan = {
     ...current,
-    ...data,
+    ...patch,
     id,
   }
 
