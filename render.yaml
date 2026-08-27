@@ -4,6 +4,14 @@ services:
     runtime: node
     buildCommand: npm install && npm run api:build
     startCommand: npm run api:start:prod
+
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DB_PATH
+        value: /data/iqtf.db
+
+    disk:
+      name: iqtf-enterprise-data
+      mountPath: /data
+      sizeGB: 1

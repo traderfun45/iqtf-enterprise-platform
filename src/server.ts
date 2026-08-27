@@ -10,6 +10,7 @@ import { systemRoutes } from './routes/system.js'
 import { cmeRoutes } from './routes/cme.js'
 import { cotRoutes } from './routes/cot.js'
 import { institutionalRoutes } from './routes/institutional.js'
+import { tradePlanRoutes } from './routes/tradePlan.js'
 
 export function buildServer() {
   const app = Fastify({
@@ -26,6 +27,7 @@ export function buildServer() {
   app.register(cmeRoutes)
   app.register(cotRoutes)
   app.register(institutionalRoutes)
+app.register(tradePlanRoutes)
   app.register(userRoutes)
 
   return app
