@@ -18,8 +18,13 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT NOT NULL UNIQUE,
     name TEXT,
+    password_hash TEXT,
+    role TEXT NOT NULL DEFAULT 'USER',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
+
+  -- Auth migration for existing databases
+  
 
   CREATE TABLE IF NOT EXISTS markets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,6 +118,24 @@ CREATE TABLE IF NOT EXISTS vol2vol_state (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `)
+try {
+  db.exec(`
+    ALTER TABLE users
+    ADD COLUMN password_hash TEXT;
+  `)
+} catch {
+  // Column already exists
+}
+
+try {
+  db.exec(`
+    ALTER TABLE users
+    ADD COLUMN role TEXT NOT NULL DEFAULT 'USER';
+  `)
+} catch {
+  // Column already exists
+}
+
 try {
   db.exec(`
     ALTER TABLE cme_market_data

@@ -41,3 +41,55 @@ export async function apiGet<T>(
     clearTimeout(timeout)
   }
 }
+
+export async function apiPost<T>(
+  path: string,
+  body: unknown,
+  timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<T> {
+  const controller = new AbortController()
+
+  const timeout = setTimeout(() => {
+    controller.abort()
+  }, timeoutMs)
+
+  try {
+    const response = await fetch(`${API}${path}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: controller.signal,
+    })
+
+    const data = await response.json().catch(() => null)
+
+    if (!response.ok) {
+      const message =
+        data &&
+        typeof data === "object" &&
+        "error" in data &&
+        typeof data.error === "string"
+          ? data.error
+          : `${response.status} ${response.statusText}`
+
+      throw new Error(message)
+    }
+
+    return data as T
+  } catch (error) {
+    if (
+      error instanceof DOMException &&
+      error.name === "AbortError"
+    ) {
+      throw new Error(`Request timeout after ${timeoutMs}ms`)
+    }
+
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+}
