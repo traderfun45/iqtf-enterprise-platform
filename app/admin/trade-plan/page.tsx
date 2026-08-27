@@ -37,6 +37,7 @@ export default function TradePlanAdminPage() {
   const [history, setHistory] = useState<TradePlan[]>([])
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
 
   async function loadData() {
     try {
@@ -104,6 +105,67 @@ export default function TradePlanAdminPage() {
     return null
   }
 
+  function startEdit(item: TradePlan) {
+    setEditingId(item.id ?? null)
+    setForm({
+      symbol: item.symbol,
+      direction: item.direction,
+      entryPrice: String(item.entryPrice),
+      stopLoss: String(item.stopLoss),
+      tp1: String(item.tp1),
+      tp2: String(item.tp2),
+      tp3: String(item.tp3),
+      status: item.status ?? 'ACTIVE',
+      note: item.note ?? '',
+    })
+    setMessage(`Editing Trade Plan #${item.id}`)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setForm({
+      ...emptyForm,
+      symbol: form.symbol,
+    })
+    setMessage('Edit cancelled')
+  }
+
+  async function updateStatus(
+    id: number,
+    status: 'CLOSED' | 'CANCELLED',
+  ) {
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const response = await fetch(`${API}/api/trade-plan/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error ?? 'Failed to update status')
+      }
+
+      setMessage(`Trade Plan #${id} marked ${status}`)
+      await loadData()
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to update status',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
 
@@ -118,23 +180,30 @@ export default function TradePlanAdminPage() {
     setMessage('')
 
     try {
-      const response = await fetch(`${API}/api/trade-plan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const payload = {
+        symbol: form.symbol,
+        direction: form.direction,
+        entryPrice: Number(form.entryPrice),
+        stopLoss: Number(form.stopLoss),
+        tp1: Number(form.tp1),
+        tp2: Number(form.tp2),
+        tp3: Number(form.tp3),
+        status: form.status,
+        note: form.note,
+      }
+
+      const response = await fetch(
+        editingId
+          ? `${API}/api/trade-plan/${editingId}`
+          : `${API}/api/trade-plan`,
+        {
+          method: editingId ? 'PUT' : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify({
-          symbol: form.symbol,
-          direction: form.direction,
-          entryPrice: Number(form.entryPrice),
-          stopLoss: Number(form.stopLoss),
-          tp1: Number(form.tp1),
-          tp2: Number(form.tp2),
-          tp3: Number(form.tp3),
-          status: form.status,
-          note: form.note,
-        }),
-      })
+      )
 
       const result = await response.json()
 
@@ -142,7 +211,13 @@ export default function TradePlanAdminPage() {
         throw new Error(result.error ?? 'Failed to save Trade Plan')
       }
 
-      setMessage('Trade Plan saved successfully')
+      setMessage(
+        editingId
+          ? 'Trade Plan updated successfully'
+          : 'Trade Plan saved successfully',
+      )
+
+      setEditingId(null)
 
       setForm({
         ...emptyForm,
@@ -305,13 +380,32 @@ export default function TradePlanAdminPage() {
             </div>
 
             <div className="md:col-span-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="rounded-md border px-5 py-2 font-medium"
-              >
-                {loading ? 'Saving...' : 'Save Trade Plan'}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded-md border px-5 py-2 font-medium"
+                >
+                  {loading
+                    ? editingId
+                      ? 'Updating...'
+                      : 'Saving...'
+                    : editingId
+                      ? 'Update Trade Plan'
+                      : 'Save Trade Plan'}
+                </button>
+
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    disabled={loading}
+                    className="rounded-md border px-5 py-2 font-medium"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
             </div>
           </form>
 
@@ -415,15 +509,53 @@ export default function TradePlanAdminPage() {
                     <td className="p-2">{item.tp3}</td>
                     <td className="p-2">{item.status}</td>
                     <td className="p-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          item.id && deletePlan(item.id)
-                        }
-                        className="rounded-md border px-2 py-1 text-xs"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(item)}
+                          disabled={loading}
+                          className="rounded-md border px-2 py-1 text-xs"
+                        >
+                          Edit
+                        </button>
+
+                        {item.status === 'ACTIVE' && item.id && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateStatus(item.id!, 'CLOSED')
+                              }
+                              disabled={loading}
+                              className="rounded-md border px-2 py-1 text-xs"
+                            >
+                              Close
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateStatus(item.id!, 'CANCELLED')
+                              }
+                              disabled={loading}
+                              className="rounded-md border px-2 py-1 text-xs"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            item.id && deletePlan(item.id)
+                          }
+                          disabled={loading}
+                          className="rounded-md border px-2 py-1 text-xs"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
