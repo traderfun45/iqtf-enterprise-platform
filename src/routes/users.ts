@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { db } from '../db/database.js'
-import { hashPassword } from '../utils/password.js'
+import { hashPassword, verifyPassword } from '../utils/password.js'
 
 export async function userRoutes(app: FastifyInstance) {
   app.get('/users', async () => {
@@ -40,6 +40,80 @@ export async function userRoutes(app: FastifyInstance) {
     return {
       data: user,
     }
+  })
+
+
+  app.post('/login', async (request, reply) => {
+    const body = request.body as {
+      email?: string
+      password?: string
+    }
+
+    if (!body?.email || typeof body.email !== 'string') {
+      return reply.code(400).send({
+        error: 'email is required',
+      })
+    }
+
+    if (!body?.password || typeof body.password !== 'string') {
+      return reply.code(400).send({
+        error: 'password is required',
+      })
+    }
+
+    const email = body.email.trim().toLowerCase()
+    const password = body.password
+
+    if (!email) {
+      return reply.code(400).send({
+        error: 'email is required',
+      })
+    }
+
+    const user = db
+      .prepare(
+        `SELECT
+          id,
+          email,
+          name,
+          role,
+          password_hash,
+          created_at
+        FROM users
+        WHERE email = ?`,
+      )
+      .get(email) as {
+        id: number
+        email: string
+        name: string | null
+        role: string
+        password_hash: string | null
+        created_at: string
+      } | undefined
+
+    if (!user || !user.password_hash) {
+      return reply.code(401).send({
+        error: 'Invalid email or password',
+      })
+    }
+
+    const valid = await verifyPassword(password, user.password_hash)
+
+    if (!valid) {
+      return reply.code(401).send({
+        error: 'Invalid email or password',
+      })
+    }
+
+    return reply.send({
+      data: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        created_at: user.created_at,
+      },
+    })
   })
 
   app.post('/users', async (request, reply) => {
