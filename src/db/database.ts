@@ -1,17 +1,13 @@
 import { DatabaseSync } from 'node:sqlite'
-import fs from 'node:fs'
 import path from 'node:path'
 
 const dbPath = process.env.DB_PATH
   ? path.resolve(process.env.DB_PATH)
   : path.resolve(process.cwd(), 'iqtf.db')
 
-const dbDir = path.dirname(dbPath)
 
-fs.mkdirSync(dbDir, { recursive: true })
 
 console.log('[DB] path:', dbPath)
-console.log('[DB] dir:', dbDir)
 
 export const db = new DatabaseSync(dbPath)
 
