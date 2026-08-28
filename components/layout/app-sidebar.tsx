@@ -77,6 +77,7 @@ export function AppSidebar() {
       const raw = localStorage.getItem("iqtf_user")
       if (raw) {
         const user = JSON.parse(raw)
+        setUserRole(user?.role ?? null)
         setIsAdmin(user?.role === "ADMIN")
       }
     } catch {
