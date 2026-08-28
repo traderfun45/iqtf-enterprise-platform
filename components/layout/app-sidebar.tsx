@@ -67,7 +67,6 @@ export function AppSidebar() {
   const pathname = usePathname()
 
   const [system, setSystem] = useState<SystemStatus | null>(null)
-  const [userRole, setUserRole] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
@@ -77,7 +76,6 @@ export function AppSidebar() {
       const raw = localStorage.getItem("iqtf_user")
       if (raw) {
         const user = JSON.parse(raw)
-        setUserRole(user?.role ?? null)
         setIsAdmin(user?.role === "ADMIN")
       }
     } catch {
@@ -167,7 +165,7 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {userRole === "ADMIN" && (
+      {isAdmin && (
         <div className="border-t border-white/10 p-4">
           <div className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-600">
             Administration
