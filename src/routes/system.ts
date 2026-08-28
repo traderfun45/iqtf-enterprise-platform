@@ -28,7 +28,7 @@ export async function systemRoutes(app: FastifyInstance) {
       process.env.DB_PATH
         ? { path: process.env.DB_PATH, source: 'DB_PATH' }
         : null,
-      { path: '/data/iqtf.db', source: 'render-disk' },
+      { path: '/var/data/iqtf.db', source: 'render-disk' },
       { path: '/tmp/iqtf.db', source: 'tmp' },
       {
         path: `${process.cwd()}/iqtf.db`,

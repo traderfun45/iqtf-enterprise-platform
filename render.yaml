@@ -4,11 +4,15 @@ services:
     runtime: node
     buildCommand: npm install && npm run api:build
     startCommand: npm run api:start:prod
-Persistent Disk:
-      Name: iqtf-data
-      Mount Path: /var/data
-      Size: 1 GB
-    
+
+    disk:
+      name: iqtf-data
+      mountPath: /var/data
+      sizeGB: 1
+
     envVars:
       - key: NODE_ENV
         value: production
+
+      - key: DB_PATH
+        value: /var/data/iqtf.db
