@@ -1,0 +1,152 @@
+import "dotenv/config"
+import OpenAI from "openai"
+import fs from "node:fs/promises"
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "x-goog-api-client": "iqtf-enterprise/1.0",
+  },
+})
+
+export async function analyzeCmeImage(imagePath: string) {
+  const imageBuffer = await fs.readFile(imagePath)
+  const base64Image = imageBuffer.toString("base64")
+
+  const response = await client.chat.completions.create({
+    model: "google/gemini-2.5-flash",
+    max_tokens: 4000,
+
+    response_format: {
+      type: "json_object",
+    },
+
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `
+Analyze this CME Group screenshot.
+
+First identify the screenshot type.
+
+Possible types:
+- CME Options / Vol2Vol
+- CME COT
+- CME Futures
+- Other CME market data
+
+Extract ONLY information actually visible in the image.
+
+For CME Options / Vol2Vol inspect:
+
+- as of date
+- underlying futures
+- contract symbols
+- DTE
+- future settlement
+- option series
+- strike prices
+- CALL values
+- PUT values
+- volatility settlement
+- volatility curve
+- expected range
+- settlement/reference lines
+- notable CALL/PUT concentration
+
+OPTION TABLE EXTRACTION:
+
+If an option table is visible anywhere in the screenshot, you MUST inspect the table directly.
+
+Do NOT skip the option table because the screenshot also contains charts.
+
+The table may be:
+- partially cropped
+- small
+- partially visible
+- missing some rows
+- missing some columns
+
+If ANY strike row is readable, extract the readable data.
+
+For each readable row identify:
+- strike
+- option series
+- CALL value
+- PUT value
+
+CALL and PUT must be read directly from the columns shown in the image.
+
+Do NOT calculate.
+Do NOT estimate.
+Do NOT infer missing digits.
+Do NOT invent values.
+
+If CALL is readable but PUT is not:
+
+"call": number,
+"put": null
+
+If PUT is readable but CALL is not:
+
+"call": null,
+"put": number
+
+If both are readable, return both.
+
+EVERY concentration object MUST contain exactly these four fields:
+
+{
+  "strike": number,
+  "series": string,
+  "call": number | null,
+  "put": number | null
+}
+
+NEVER omit "call".
+NEVER omit "put".
+
+If multiple series exist, preserve the correct series for each row.
+
+Return at most 15 objects.
+
+Prioritize:
+1. Rows with both CALL and PUT readable.
+2. Highest clearly readable CALL values.
+3. Highest clearly readable PUT values.
+4. Strikes closest to the underlying futures price.
+
+If only one readable row exists, return that one row.
+
+Only return an empty array if there is genuinely NO readable strike row with CALL or PUT information anywhere in the screenshot.
+
+IMPORTANT:
+The purpose is to READ the option table, not merely identify "concentration" zones.
+
+Return:
+
+"notable_call_put_concentrations": []
+
+            },
+          ],
+        },
+      ],
+    })
+
+  try {
+    return JSON.parse(cleaned)
+  } catch (error) {
+    console.error("===== INVALID OPENROUTER JSON =====")
+    console.error(cleaned)
+
+    throw new Error(
+      `OpenRouter returned invalid JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+}

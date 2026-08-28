@@ -1,0 +1,245 @@
+import "dotenv/config"
+import OpenAI from "openai"
+import fs from "node:fs/promises"
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "x-goog-api-client": "iqtf-enterprise/1.0",
+  },
+})
+
+export async function analyzeCmeImage(imagePath: string) {
+  const imageBuffer = await fs.readFile(imagePath)
+  const base64Image = imageBuffer.toString("base64")
+
+  const response = await client.chat.completions.create({
+    model: "google/gemini-2.5-flash",
+    max_tokens: 4000,
+
+    response_format: {
+      type: "json_object",
+    },
+
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `
+Analyze this CME Group screenshot.
+
+First identify the screenshot type.
+
+Possible types:
+- CME Options / Vol2Vol
+- CME COT
+- CME Futures
+- Other CME market data
+
+Extract ONLY information actually visible in the image.
+
+For CME Options / Vol2Vol inspect:
+
+- as of date
+- underlying futures
+- contract symbols
+- DTE
+- future settlement
+- option series
+- strike prices
+- CALL values
+- PUT values
+- volatility settlement
+- volatility curve
+- expected range
+- settlement/reference lines
+- notable CALL/PUT concentrations
+
+CONCENTRATION EXTRACTION:
+
+The screenshot may contain an option table with many strike rows.
+
+FIRST inspect the option table carefully.
+SECOND identify readable CALL and PUT values.
+THIRD select the most significant concentration rows.
+
+Do NOT assume the option table is absent merely because part of it is cropped.
+
+If strike rows and CALL/PUT values are visibly readable, extract them.
+
+Return at most 15 concentration objects total.
+
+Prioritize:
+
+1. Highest CALL values.
+2. Highest PUT values.
+3. Strikes closest to the underlying futures price.
+4. Rows where both CALL and PUT are visible.
+
+Do NOT reproduce the entire table.
+
+Do NOT invent values.
+Do NOT calculate values.
+Do NOT estimate unreadable values.
+
+Every concentration object MUST contain exactly:
+
+{
+  "strike": number,
+  "series": string,
+  "call": number | null,
+  "put": number | null
+}
+
+Never omit "call".
+Never omit "put".
+
+If only CALL is readable:
+"call": number,
+"put": null
+
+If only PUT is readable:
+"call": null,
+"put": number
+
+If both are readable, return both.
+
+If multiple option series exist at the same strike, create separate objects.
+
+Read numbers directly from the image.
+
+Do NOT assume CALL/PUT values are Volume or Open Interest unless explicitly labeled.
+
+If the image is cropped, only return values that are actually readable.
+
+Do not use market knowledge to fill missing values.
+
+VOLATILITY SETTLEMENT:
+
+Return the numeric volatility settlement ONLY if clearly readable.
+
+If not clearly readable, return null.
+
+VOLATILITY CURVE:
+
+Return an object only if clearly visible and readable.
+
+Example:
+
+{
+  "type": "settlement",
+  "value": 29.77,
+  "change": -0.03
+}
+
+Otherwise return null.
+
+EXPECTED RANGE:
+
+If expected range / standard deviation levels are clearly visible, return:
+
+{
+  "center_strike": 4562.6,
+  "std_dev_zones": [
+    {
+      "zone": "1 Standard Deviation",
+      "lower_bound": 4511.3,
+      "upper_bound": 4613.9,
+      "implied_move_pts": 51.3
+    }
+  ]
+}
+
+Do NOT return an array called "values".
+
+Do NOT return unlabeled numbers.
+
+If expected range cannot be read reliably, return null.
+
+UNDERLYING FUTURES:
+
+If the image shows something like:
+
+"Gold (GC)"
+
+or
+
+"Gold (OG|GC) vs 4562.6"
+
+extract:
+
+{
+  "symbol": "GC",
+  "price": 4562.6
+}
+
+If the underlying futures value cannot be read clearly, return [].
+
+OPTION SERIES:
+
+Return visible option series such as:
+
+["OG3Q6"]
+
+Return ONLY valid JSON.
+
+Do NOT use markdown.
+Do NOT use code fences.
+Do NOT add explanations outside JSON.
+
+Return exactly this top-level structure:
+
+{
+  "screenshot_type": "...",
+  "as_of_date": null,
+  "underlying_futures": [],
+  "option_series": [],
+  "volatility_settlement": null,
+  "volatility_curve": null,
+  "expected_range": null,
+  "settlement_reference_lines": null,
+  "notable_call_put_concentrations": [],
+  "unreadable_or_missing_information": []
+}
+`,
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${base64Image}`,
+            },
+          },
+        ],
+      },
+    ],
+  })
+
+  const content = response.choices[0]?.message?.content ?? ""
+
+  if (!content) {
+    throw new Error("OpenRouter returned an empty response")
+  }
+
+  const cleaned = content
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim()
+
+  try {
+    return JSON.parse(cleaned)
+  } catch (error) {
+    console.error("===== INVALID OPENROUTER JSON =====")
+    console.error(cleaned)
+
+    throw new Error(
+      `OpenRouter returned invalid JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+}

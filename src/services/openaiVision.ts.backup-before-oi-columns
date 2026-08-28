@@ -1,0 +1,384 @@
+import "dotenv/config"
+import OpenAI from "openai"
+import fs from "node:fs/promises"
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "x-goog-api-client": "iqtf-enterprise/1.0",
+  },
+})
+
+export async function analyzeCmeImage(imagePath: string) {
+  const imageBuffer = await fs.readFile(imagePath)
+  const base64Image = imageBuffer.toString("base64")
+
+  const response = await client.chat.completions.create({
+    model: "google/gemini-2.5-flash",
+    max_tokens: 3500,
+
+    response_format: {
+      type: "json_object",
+    },
+
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `
+Analyze this CME Group screenshot.
+
+First identify the screenshot type.
+
+Possible types:
+- CME Options / Vol2Vol
+- CME COT
+- CME Futures
+- Other CME market data
+
+Extract ONLY information actually visible in the image.
+
+For CME Options / Vol2Vol inspect:
+
+- as of date
+- underlying futures
+- contract symbols
+- DTE
+- future settlement
+- option series
+- strike prices
+- CALL values
+- PUT values
+- volatility settlement
+- volatility curve
+- expected range
+- settlement/reference lines
+- notable CALL/PUT concentrations
+
+CONCENTRATION EXTRACTION:
+
+CRITICAL OPTION TABLE TASK:
+
+Do not stop after identifying the screenshot metadata.
+
+The primary task is to inspect the visible option table.
+
+Look specifically for:
+- strike column
+- CALL column
+- PUT column
+- option series labels
+- numeric values in each row
+
+Even if the table is partially cropped, inspect every visible row.
+
+If at least one strike and one CALL or PUT number can be read,
+you MUST return that row in option_rows.
+
+Example:
+[
+  {
+    "strike": 4500,
+    "series": "OG3Q6",
+    "call": 17702,
+    "put": 3786
+  }
+]
+
+Do not return [] merely because the entire table is not visible.
+
+Return [] ONLY when there are genuinely no readable strike/CALL/PUT
+numbers anywhere in the image.
+
+This is the MOST IMPORTANT extraction task for CME Options / Vol2Vol.
+
+The image may contain a table/grid showing option strikes with CALL and PUT values.
+
+DO NOT decide whether a concentration exists before inspecting the table.
+
+Follow these steps exactly:
+
+RAW OPTION TABLE EXTRACTION:
+
+This is a raw OCR extraction task, NOT a concentration detection task.
+
+First read the visible option table before deciding anything about concentrations.
+
+Extract every clearly readable option row containing:
+- strike
+- CALL value
+- PUT value
+- option series
+
+Return these raw rows under "option_rows".
+
+A row MUST be returned if the strike and at least one CALL or PUT value
+are clearly readable.
+
+Do NOT require the row to be a concentration.
+Do NOT filter rows because the values are small.
+Do NOT calculate values.
+Do NOT estimate unreadable digits.
+Do NOT invent values.
+
+Example:
+
+"option_rows": [
+  {
+    "strike": 4500,
+    "series": "OG3Q6",
+    "call": 10694,
+    "put": 1261
+  }
+]
+
+If CALL is unreadable, use null.
+If PUT is unreadable, use null.
+
+Return [] only when no readable strike plus CALL/PUT value exists.
+
+STEP 1 — LOCATE THE OPTION TABLE
+Find the visible option table/grid in the screenshot.
+
+Identify:
+- strike column
+- CALL column/value
+- PUT column/value
+- option series/contract symbol if visible
+
+STEP 2 — READ THE TABLE ROW BY ROW
+DEBUG TABLE EXTRACTION:
+
+Before selecting concentrations, inspect the visible option table.
+
+Return every clearly readable row in a temporary field:
+
+"debug_visible_rows": [
+  {
+    "strike": number,
+    "series": string,
+    "call": number | null,
+    "put": number | null
+  }
+]
+
+This field is for debugging OCR only.
+
+Do not invent values.
+Do not calculate values.
+Do not estimate unreadable digits.
+
+If no readable table row exists, return [].
+
+The debug_visible_rows field MUST be included even when empty.
+
+For every clearly readable strike row, inspect the CALL and PUT values.
+
+A value is considered readable when the digits can be directly recognized from the image.
+
+Do not require the row to be labeled "concentration".
+
+STEP 3 — EXTRACT SIGNIFICANT ROWS
+From the readable rows, return up to 15 rows.
+
+Prioritize rows with:
+1. largest CALL values
+2. largest PUT values
+3. large combined CALL + PUT values
+4. strikes near the underlying futures price
+
+If the table clearly contains readable CALL/PUT values, YOU MUST return concentration objects.
+
+IMPORTANT:
+Do NOT return an empty array merely because the screenshot does not explicitly label rows as "concentration".
+
+If readable strike/CALL/PUT rows exist, extract them.
+
+Each object MUST have exactly:
+
+{
+  "strike": number,
+  "series": string,
+  "call": number | null,
+  "put": number | null
+}
+
+If the series is visible, use the exact series symbol such as "OG3Q6".
+
+If the series is not visible in the same row but the screenshot clearly identifies one option series, use that visible option series.
+
+CALL and PUT values must be copied directly from the image.
+
+Do NOT calculate CALL or PUT values.
+
+Do NOT estimate unreadable digits.
+
+Do NOT invent missing values.
+
+If CALL is readable but PUT is not:
+
+{
+  "strike": 4500,
+  "series": "OG3Q6",
+  "call": 17702,
+  "put": null
+}
+
+If PUT is readable but CALL is not:
+
+{
+  "strike": 4500,
+  "series": "OG3Q6",
+  "call": null,
+  "put": 3786
+}
+
+If both are readable, return both.
+
+If multiple series exist, create separate objects for each series.
+
+VERY IMPORTANT:
+The CALL/PUT numbers may represent volume, open interest, or another metric depending on the table heading.
+
+Do NOT rename or reinterpret the values.
+
+Simply extract the visible numeric values and preserve their meaning through the field names "call" and "put".
+
+If the table is partially cropped:
+extract every clearly readable row that can be identified.
+
+Do NOT return [] if at least one strike and one CALL or PUT value are clearly readable.
+
+Only return [] when no strike/CALL/PUT values can actually be read from the image.
+
+
+
+VOLATILITY SETTLEMENT:
+
+Return the numeric volatility settlement ONLY if clearly readable.
+
+If not clearly readable, return null.
+
+VOLATILITY CURVE:
+
+Return an object only if clearly visible and readable.
+
+Example:
+
+{
+  "type": "settlement",
+  "value": 29.77,
+  "change": -0.03
+}
+
+Otherwise return null.
+
+EXPECTED RANGE:
+
+If expected range / standard deviation levels are clearly visible, return:
+
+{
+  "center_strike": 4562.6,
+  "std_dev_zones": [
+    {
+      "zone": "1 Standard Deviation",
+      "lower_bound": 4511.3,
+      "upper_bound": 4613.9,
+      "implied_move_pts": 51.3
+    }
+  ]
+}
+
+Do NOT return an array called "values".
+
+Do NOT return unlabeled numbers.
+
+If expected range cannot be read reliably, return null.
+
+UNDERLYING FUTURES:
+
+If the image shows something like:
+
+"Gold (GC)"
+
+or
+
+"Gold (OG|GC) vs 4562.6"
+
+extract:
+
+{
+  "symbol": "GC",
+  "price": 4562.6
+}
+
+If the underlying futures value cannot be read clearly, return [].
+
+OPTION SERIES:
+
+Return visible option series such as:
+
+["OG3Q6"]
+
+Return ONLY valid JSON.
+
+Do NOT use markdown.
+Do NOT use code fences.
+Do NOT add explanations outside JSON.
+
+Return exactly this top-level structure:
+
+{
+  "screenshot_type": "...",
+  "as_of_date": null,
+  "underlying_futures": [],
+  "option_series": [],
+  "volatility_settlement": null,
+  "volatility_curve": null,
+  "expected_range": null,
+  "settlement_reference_lines": null,
+   "option_rows": [],
+  "unreadable_or_missing_information": []
+}
+`,
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${base64Image}`,
+            },
+          },
+        ],
+      },
+    ],
+  })
+
+  const content = response.choices[0]?.message?.content ?? ""
+
+  if (!content) {
+    throw new Error("OpenRouter returned an empty response")
+  }
+
+  const cleaned = content
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim()
+
+  try {
+    return JSON.parse(cleaned)
+  } catch (error) {
+    console.error("===== INVALID OPENROUTER JSON =====")
+    console.error(cleaned)
+
+    throw new Error(
+      `OpenRouter returned invalid JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+}

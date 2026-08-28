@@ -1,0 +1,154 @@
+export type OptionConcentration = {
+  strike: number
+  series: string
+  type: 'CALL' | 'PUT'
+  value: number
+}
+
+export type CmeOptionStrikeSummary = {
+  strike: number
+  callVolume: number
+  putVolume: number
+  totalVolume: number
+  callPutRatio: number | null
+  callPutImbalance: number
+  dominantSide: 'CALL' | 'PUT' | 'BALANCED'
+}
+
+export type CmeOptionIntelligence = {
+  totalConcentrations: number
+  totalCallValue: number
+  totalPutValue: number
+  overallCallPutRatio: number | null
+  overallImbalance: number
+  overallBias: 'CALL' | 'PUT' | 'BALANCED'
+  dominantStrike: number | null
+  dominantStrikeVolume: number
+  strikes: CmeOptionStrikeSummary[]
+}
+
+export function analyzeCmeOptionIntelligence(
+  concentrations: OptionConcentration[],
+): CmeOptionIntelligence {
+  const valid = concentrations.filter(
+    (item) =>
+      Number.isFinite(item.strike) &&
+      typeof item.series === 'string' &&
+      item.series.length > 0 &&
+      (item.type === 'CALL' || item.type === 'PUT') &&
+      Number.isFinite(item.value) &&
+      item.value >= 0,
+  )
+
+  const strikeMap = new Map<
+    number,
+    { callVolume: number; putVolume: number }
+  >()
+
+  for (const item of valid) {
+    const current = strikeMap.get(item.strike) ?? {
+      callVolume: 0,
+      putVolume: 0,
+    }
+
+    if (item.type === 'CALL') {
+      current.callVolume += item.value
+    } else {
+      current.putVolume += item.value
+    }
+
+    strikeMap.set(item.strike, current)
+  }
+
+  const strikes: CmeOptionStrikeSummary[] = []
+
+  for (const [strike, values] of strikeMap.entries()) {
+    const totalVolume =
+      values.callVolume + values.putVolume
+
+    const callPutRatio =
+      values.putVolume > 0
+        ? values.callVolume / values.putVolume
+        : null
+
+    const callPutImbalance =
+      totalVolume > 0
+        ? (values.callVolume - values.putVolume) /
+          totalVolume
+        : 0
+
+    let dominantSide:
+      | 'CALL'
+      | 'PUT'
+      | 'BALANCED' = 'BALANCED'
+
+    if (values.callVolume > values.putVolume) {
+      dominantSide = 'CALL'
+    } else if (values.putVolume > values.callVolume) {
+      dominantSide = 'PUT'
+    }
+
+    strikes.push({
+      strike,
+      callVolume: values.callVolume,
+      putVolume: values.putVolume,
+      totalVolume,
+      callPutRatio,
+      callPutImbalance,
+      dominantSide,
+    })
+  }
+
+  strikes.sort(
+    (a, b) => b.totalVolume - a.totalVolume,
+  )
+
+  const totalCallValue = valid
+    .filter((item) => item.type === 'CALL')
+    .reduce((sum, item) => sum + item.value, 0)
+
+  const totalPutValue = valid
+    .filter((item) => item.type === 'PUT')
+    .reduce((sum, item) => sum + item.value, 0)
+
+  const total = totalCallValue + totalPutValue
+
+  const overallCallPutRatio =
+    totalPutValue > 0
+      ? totalCallValue / totalPutValue
+      : null
+
+  const overallImbalance =
+    total > 0
+      ? (totalCallValue - totalPutValue) / total
+      : 0
+
+  let overallBias:
+    | 'CALL'
+    | 'PUT'
+    | 'BALANCED' = 'BALANCED'
+
+  if (totalCallValue > totalPutValue) {
+    overallBias = 'CALL'
+  } else if (totalPutValue > totalCallValue) {
+    overallBias = 'PUT'
+  }
+
+  return {
+    totalConcentrations: valid.length,
+    totalCallValue,
+    totalPutValue,
+    overallCallPutRatio,
+    overallImbalance,
+    overallBias,
+    dominantStrike:
+      strikes.length > 0
+        ? strikes[0].strike
+        : null,
+    dominantStrikeVolume:
+      strikes.length > 0
+        ? strikes[0].totalVolume
+        : 0,
+    strikes,
+  }
+}

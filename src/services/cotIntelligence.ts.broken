@@ -1,0 +1,69 @@
+import type { CotMarketData } from '../db/cot.js'
+
+export type CotPositioning =
+  | 'STRONG_LONG'
+  | 'LONG'
+  | 'NEUTRAL'
+  | 'SHORT'
+  | 'STRONG_SHORT'
+
+export type CotConfidence =
+  | 'HIGH'
+  | 'MEDIUM'
+  | 'LOW'
+
+export type CotIntelligence = {
+  managedMoneyNet: number
+  producerNet: number
+  swapDealerNet: number
+  otherReportablesNet: number
+
+  managedMoneyNetChange: number
+  producerNetChange: number
+  swapDealerNetChange: number
+  otherReportablesNetChange: number
+
+  positioning: CotPositioning
+  confidence: CotConfidence
+  score: number
+
+  reasons: string[]
+}
+
+function value(value: number | undefined): number {
+  return value ?? 0
+}
+
+function net(
+  long: number | undefined,
+  short: number | undefined,
+): number {
+  return value(long) - value(short)
+}
+
+export function analyzeCotIntelligence(params: {
+  latest: CotMarketData
+  previous?: CotMarketData | null
+}): CotIntelligence {
+  const { latest, previous } = params
+
+  const managedMoneyNet = net(
+    latest.managedMoneyLong,
+    latest.managedMoneyShort,
+  )
+
+  const producerNet = net(
+    latest.producerLong,
+    latest.producerShort,
+  )
+
+  const swapDealerNet = net(
+    latest.swapDealerLong,
+    latest.swapDealerShort,
+  )
+
+  const otherReportablesNet = net(
+    latest.otherReportablesLong,
+    latest.otherReportablesShort,
+  )
+

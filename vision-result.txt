@@ -1,0 +1,117 @@
+===== OPENAI CME VISION TEST =====
+Image: /data/data/com.termux/files/home/storage/shared/Download/Screenshot_20260821_152401_com.android.chrome (1).jpg
+
+===== AI RESULT =====
+{
+  screenshot_type: 'CME Options / Vol2Vol',
+  as_of_date: '20/8/2569',
+  underlying_futures: [
+    { symbol: 'GCV6', dte: 69, future_settlement: 4587.4 },
+    { symbol: 'GCZ6', dte: 131, future_settlement: 4621.6 },
+    { symbol: 'GCG7', dte: 188, future_settlement: 4658.4 }
+  ],
+  option_series: [
+    { symbol: 'OG3Q6', dte: 0 },
+    { symbol: 'OGU6', dte: 5 },
+    { symbol: 'OGV6', dte: 34 },
+    { symbol: 'OGX6', dte: 67 },
+    { symbol: 'OGZ6', dte: 95 },
+    { symbol: 'OGG7', dte: 158 },
+    { symbol: 'OGH7', dte: 186 }
+  ],
+  volatility_settlement: null,
+  volatility_curve: null,
+  expected_range: null,
+  settlement_reference_lines: null,
+  notable_call_put_concentrations: [
+    { strike: 4500, series: 'OG3Q6', call: 333, put: 318 },
+    { strike: 4500, series: 'OGU6', call: 2180, put: 859 },
+    { strike: 4500, series: 'OGV6', call: 3465, put: 1126 },
+    { strike: 4500, series: 'OGX6', call: 1030, put: 222 },
+    { strike: 4500, series: 'OGZ6', call: 10694, put: 1261 },
+    { strike: 4500, series: 'OGH7', call: 6, put: 100 },
+    { strike: 4510, series: 'OGZ6', call: 5028, put: 3 },
+    { strike: 4525, series: 'OG3Q6', call: 254, put: 30 },
+    { strike: 4525, series: 'OGZ6', call: 137, put: 309 },
+    { strike: 4550, series: 'OG3Q6', call: 214, put: 52 },
+    { strike: 4550, series: 'OGU6', call: 1724, put: 589 },
+    { strike: 4550, series: 'OGH7', call: 241, put: null },
+    { strike: 4575, series: 'OG3Q6', call: 297, put: 2 },
+    { strike: 4585, series: 'OGX6', call: 206, put: 158 },
+    { strike: 4590, series: 'OGX6', call: 130, put: 100 },
+    { strike: 4600, series: 'OG3Q6', call: 654, put: 5 },
+    { strike: 4600, series: 'OGU6', call: 2496, put: 131 },
+    { strike: 4600, series: 'OGV6', call: 5554, put: 380 },
+    { strike: 4600, series: 'OGX6', call: 3513, put: 134 },
+    { strike: 4600, series: 'OGZ6', call: 5097, put: 950 },
+    { strike: 4600, series: 'OGG7', call: 1828, put: 36 }
+  ],
+  unreadable_or_missing_information: 'Rightmost underlying futures contract column header is partially cropped showing 251 DTE and price starting with 468.'
+}
+
+===== DEBUG CONCENTRATION FIELD =====
+undefined
+
+===== NORMALIZED RESULT =====
+{
+  screenshotType: 'CME Options / Vol2Vol',
+  asOfDate: '20/8/2569',
+  underlyingFutures: [
+    { symbol: 'GCV6', dte: 69, settlement: 4587.4 },
+    { symbol: 'GCZ6', dte: 131, settlement: 4621.6 },
+    { symbol: 'GCG7', dte: 188, settlement: 4658.4 }
+  ],
+  optionSeries: [
+    { symbol: 'OG3Q6', dte: 0 },
+    { symbol: 'OGU6', dte: 5 },
+    { symbol: 'OGV6', dte: 34 },
+    { symbol: 'OGX6', dte: 67 },
+    { symbol: 'OGZ6', dte: 95 },
+    { symbol: 'OGG7', dte: 158 },
+    { symbol: 'OGH7', dte: 186 }
+  ],
+  notableConcentrations: [
+    { strike: 4500, series: 'OG3Q6', type: 'CALL', value: 333 },
+    { strike: 4500, series: 'OG3Q6', type: 'PUT', value: 318 },
+    { strike: 4500, series: 'OGU6', type: 'CALL', value: 2180 },
+    { strike: 4500, series: 'OGU6', type: 'PUT', value: 859 },
+    { strike: 4500, series: 'OGV6', type: 'CALL', value: 3465 },
+    { strike: 4500, series: 'OGV6', type: 'PUT', value: 1126 },
+    { strike: 4500, series: 'OGX6', type: 'CALL', value: 1030 },
+    { strike: 4500, series: 'OGX6', type: 'PUT', value: 222 },
+    { strike: 4500, series: 'OGZ6', type: 'CALL', value: 10694 },
+    { strike: 4500, series: 'OGZ6', type: 'PUT', value: 1261 },
+    { strike: 4500, series: 'OGH7', type: 'CALL', value: 6 },
+    { strike: 4500, series: 'OGH7', type: 'PUT', value: 100 },
+    { strike: 4510, series: 'OGZ6', type: 'CALL', value: 5028 },
+    { strike: 4510, series: 'OGZ6', type: 'PUT', value: 3 },
+    { strike: 4525, series: 'OG3Q6', type: 'CALL', value: 254 },
+    { strike: 4525, series: 'OG3Q6', type: 'PUT', value: 30 },
+    { strike: 4525, series: 'OGZ6', type: 'CALL', value: 137 },
+    { strike: 4525, series: 'OGZ6', type: 'PUT', value: 309 },
+    { strike: 4550, series: 'OG3Q6', type: 'CALL', value: 214 },
+    { strike: 4550, series: 'OG3Q6', type: 'PUT', value: 52 },
+    { strike: 4550, series: 'OGU6', type: 'CALL', value: 1724 },
+    { strike: 4550, series: 'OGU6', type: 'PUT', value: 589 },
+    { strike: 4550, series: 'OGH7', type: 'CALL', value: 241 },
+    { strike: 4575, series: 'OG3Q6', type: 'CALL', value: 297 },
+    { strike: 4575, series: 'OG3Q6', type: 'PUT', value: 2 },
+    { strike: 4585, series: 'OGX6', type: 'CALL', value: 206 },
+    { strike: 4585, series: 'OGX6', type: 'PUT', value: 158 },
+    { strike: 4590, series: 'OGX6', type: 'CALL', value: 130 },
+    { strike: 4590, series: 'OGX6', type: 'PUT', value: 100 },
+    { strike: 4600, series: 'OG3Q6', type: 'CALL', value: 654 },
+    { strike: 4600, series: 'OG3Q6', type: 'PUT', value: 5 },
+    { strike: 4600, series: 'OGU6', type: 'CALL', value: 2496 },
+    { strike: 4600, series: 'OGU6', type: 'PUT', value: 131 },
+    { strike: 4600, series: 'OGV6', type: 'CALL', value: 5554 },
+    { strike: 4600, series: 'OGV6', type: 'PUT', value: 380 },
+    { strike: 4600, series: 'OGX6', type: 'CALL', value: 3513 },
+    { strike: 4600, series: 'OGX6', type: 'PUT', value: 134 },
+    { strike: 4600, series: 'OGZ6', type: 'CALL', value: 5097 },
+    { strike: 4600, series: 'OGZ6', type: 'PUT', value: 950 },
+    { strike: 4600, series: 'OGG7', type: 'CALL', value: 1828 },
+    { strike: 4600, series: 'OGG7', type: 'PUT', value: 36 }
+  ],
+  unreadableOrMissingInformation: 'Rightmost underlying futures contract column header is partially cropped showing 251 DTE and price starting with 468.'
+}

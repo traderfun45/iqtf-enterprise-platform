@@ -1,0 +1,58 @@
+import { normalizeCmeVision } from "./src/services/cmeVisionNormalizer"
+
+const sample = {
+  screenshot_type: "CME Options / Vol2Vol",
+  as_of_date: "20/8/2569",
+
+  underlying_futures: [
+    {
+      symbol: "GCV6",
+      dte: 69,
+      future_settlement: 4587.4,
+    },
+    {
+      symbol: "GCZ6",
+      dte: 131,
+      future_settlement: 4621.6,
+    },
+    {
+      symbol: "GCG7",
+      dte: 188,
+      future_settlement: 4658.4,
+    },
+  ],
+
+  option_series: [
+    { symbol: "OG3Q6", dte: 0 },
+    { symbol: "OGU6", dte: 5 },
+    { symbol: "OGV6", dte: 34 },
+    { symbol: "OGX6", dte: 67 },
+    { symbol: "OGZ6", dte: 95 },
+    { symbol: "OGG7", dte: 158 },
+    { symbol: "OGH7", dte: 186 },
+  ],
+
+  strikes_range_visible: {
+    min_strike: 4485,
+    max_strike: 4600,
+  },
+
+  important_volume_or_oi_concentration: [
+    "OGZ6 4500 CALL: 10,694",
+    "OGV6 4600 CALL: 5,554",
+    "OGZ6 4600 CALL: 5,097",
+    "OGZ6 4510 CALL: 5,028",
+    "OGX6 4600 CALL: 3,513",
+    "OGV6 4500 CALL: 3,465",
+    "OGU6 4600 CALL: 2,496",
+    "OGZ6 4500 PUT: 1,261",
+  ],
+
+  unreadable_or_missing_information:
+    "Volume or Open Interest is not explicitly identified.",
+}
+
+const result = normalizeCmeVision(sample)
+
+console.log("===== CME NORMALIZER TEST =====")
+console.dir(result, { depth: null })

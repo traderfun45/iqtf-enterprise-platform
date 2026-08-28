@@ -1,0 +1,630 @@
+'use client'
+
+import { FormEvent, useEffect, useState } from 'react'
+import { API } from '@/lib/api'
+
+type CmeData = {
+  id?: number
+  symbol: string
+  dataDate: string
+  dataTime?: string
+  settlementPrice?: number
+  volume?: number
+  volumeZscore?: number
+  openInterest?: number
+  oiChange?: number
+  oiZscore?: number
+  source?: string
+  note?: string
+}
+
+type CmeAnalysis = {
+  symbol: string
+  intelligence?: {
+    priceChange?: number
+    volumeChange?: number
+    openInterestChange?: number
+    positioning?: string
+    volumeConfirmation?: string
+    oiConfirmation?: string
+    confirmationScore?: number
+  }
+  vol2vol?: {
+    signal?: string
+    confidence?: string
+    score?: number
+    positioning?: string
+    reasons?: string[]
+  }
+  previousState?: string
+  vol2volState?: {
+    state?: string
+    action?: string
+  }
+  savedState?: {
+    updatedAt?: string
+  }
+}
+
+const emptyForm: CmeData = {
+  symbol: 'GC',
+  dataDate: new Date().toISOString().slice(0, 10),
+  dataTime: '',
+  settlementPrice: undefined,
+  volume: undefined,
+  volumeZscore: undefined,
+  openInterest: undefined,
+  oiChange: undefined,
+  oiZscore: undefined,
+  source: 'CME',
+  note: '',
+}
+
+export default function CmeAdminPage() {
+  const [form, setForm] = useState<CmeData>(emptyForm)
+  const [history, setHistory] = useState<CmeData[]>([])
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [analysis, setAnalysis] = useState<CmeAnalysis | null>(null)
+
+  async function loadAnalysis() {
+    try {
+      const response = await fetch(
+        `${API}/api/cme/analysis?symbol=${form.symbol}`,
+        { cache: 'no-store' },
+      )
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        setAnalysis(null)
+        return
+      }
+
+      setAnalysis(result)
+    } catch {
+      setAnalysis(null)
+    }
+  }
+
+  async function loadHistory() {
+    try {
+      const response = await fetch(
+        `${API}/api/cme/history?symbol=${form.symbol}`,
+        { cache: 'no-store' },
+      )
+
+      const result = await response.json()
+      setHistory(result.data ?? [])
+    } catch {
+      setMessage('Unable to load CME history')
+    }
+  }
+
+  useEffect(() => {
+    loadHistory()
+    loadAnalysis()
+  }, [form.symbol])
+
+  function updateNumber(
+    field: keyof CmeData,
+    value: string,
+  ) {
+    setForm((current) => ({
+      ...current,
+      [field]: value === '' ? undefined : Number(value),
+    }))
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const response = await fetch(`${API}/api/cme`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error ?? 'Failed to save CME data')
+      }
+
+      setMessage('CME data saved successfully')
+      setForm({
+        ...emptyForm,
+        dataDate: new Date().toISOString().slice(0, 10),
+      })
+
+      await loadHistory()
+      await loadAnalysis()
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to save CME data',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <main className="min-h-screen p-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <header>
+          <h1 className="text-3xl font-bold">
+            CME Futures Data
+          </h1>
+          <p className="mt-1 text-sm opacity-70">
+            GC Futures administrative data input
+          </p>
+        </header>
+
+        <section className="rounded-xl border p-6">
+          <form
+            onSubmit={handleSubmit}
+            className="grid gap-4 md:grid-cols-2"
+          >
+            <label className="space-y-1">
+              <span className="text-sm">Symbol</span>
+              <select
+                value={form.symbol}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    symbol: event.target.value,
+                  })
+                }
+                className="w-full rounded-md border bg-transparent p-2"
+              >
+                <option value="GC">GC</option>
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">Data Date</span>
+              <input
+                type="date"
+                value={form.dataDate}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    dataDate: event.target.value,
+                  })
+                }
+                className="w-full rounded-md border bg-transparent p-2"
+                required
+              />
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">Data Time</span>
+              <input
+                type="time"
+                value={form.dataTime ?? ''}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    dataTime: event.target.value,
+                  })
+                }
+                className="w-full rounded-md border bg-transparent p-2"
+              />
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">Settlement Price</span>
+              <input
+                type="number"
+                step="0.01"
+                value={form.settlementPrice ?? ''}
+                onChange={(event) =>
+                  updateNumber(
+                    'settlementPrice',
+                    event.target.value,
+                  )
+                }
+                className="w-full rounded-md border bg-transparent p-2"
+              />
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">Volume</span>
+              <input
+                type="number"
+                value={form.volume ?? ''}
+                onChange={(event) =>
+                  updateNumber('volume', event.target.value)
+                }
+                className="w-full rounded-md border bg-transparent p-2"
+              />
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">Volume Z-Score</span>
+              <input
+                type="number"
+                step="0.01"
+                value={form.volumeZscore ?? ''}
+                onChange={(event) =>
+                  updateNumber(
+                    'volumeZscore',
+                    event.target.value,
+                  )
+                }
+                className="w-full rounded-md border bg-transparent p-2"
+              />
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">Open Interest</span>
+              <input
+                type="number"
+                value={form.openInterest ?? ''}
+                onChange={(event) =>
+                  updateNumber(
+                    'openInterest',
+                    event.target.value,
+                  )
+                }
+                className="w-full rounded-md border bg-transparent p-2"
+              />
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">OI Change</span>
+              <input
+                type="number"
+                value={form.oiChange ?? ''}
+                onChange={(event) =>
+                  updateNumber('oiChange', event.target.value)
+                }
+                className="w-full rounded-md border bg-transparent p-2"
+              />
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">OI Z-Score</span>
+              <input
+                type="number"
+                step="0.01"
+                value={form.oiZscore ?? ''}
+                onChange={(event) =>
+                  updateNumber(
+                    'oiZscore',
+                    event.target.value,
+                  )
+                }
+                className="w-full rounded-md border bg-transparent p-2"
+              />
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">Source</span>
+              <input
+                value={form.source ?? ''}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    source: event.target.value,
+                  })
+                }
+                className="w-full rounded-md border bg-transparent p-2"
+              />
+            </label>
+
+            <label className="space-y-1 md:col-span-2">
+              <span className="text-sm">Note</span>
+              <textarea
+                value={form.note ?? ''}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    note: event.target.value,
+                  })
+                }
+                className="min-h-24 w-full rounded-md border bg-transparent p-2"
+              />
+            </label>
+
+            <div className="md:col-span-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="rounded-md border px-5 py-2 font-medium"
+              >
+                {loading ? 'Saving...' : 'Save CME Data'}
+              </button>
+            </div>
+          </form>
+
+          {message && (
+            <p className="mt-4 text-sm">{message}</p>
+          )}
+        </section>
+
+        <section className="rounded-xl border p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">
+                CME Institutional Analysis
+              </h2>
+              <p className="text-sm opacity-60">
+                CME Intelligence + Vol2Vol State
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={loadAnalysis}
+              className="rounded-md border px-3 py-1.5 text-sm"
+            >
+              Refresh Analysis
+            </button>
+          </div>
+
+          {!analysis ? (
+            <p className="text-sm opacity-60">
+              No analysis available
+            </p>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <h3 className="mb-3 font-semibold">
+                  CME Intelligence
+                </h3>
+
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Price Change
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {analysis.intelligence?.priceChange ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Volume Change
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {analysis.intelligence?.volumeChange ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      OI Change
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {analysis.intelligence?.openInterestChange ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Confirmation Score
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {analysis.intelligence?.confirmationScore ?? '-'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Positioning
+                    </div>
+                    <div className="font-semibold">
+                      {analysis.intelligence?.positioning ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Volume Confirmation
+                    </div>
+                    <div className="font-semibold">
+                      {analysis.intelligence?.volumeConfirmation ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      OI Confirmation
+                    </div>
+                    <div className="font-semibold">
+                      {analysis.intelligence?.oiConfirmation ?? '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-3 font-semibold">
+                  Vol2Vol
+                </h3>
+
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Signal
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {analysis.vol2vol?.signal ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Confidence
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {analysis.vol2vol?.confidence ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Score
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {analysis.vol2vol?.score ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Positioning
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {analysis.vol2vol?.positioning ?? '-'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-lg border p-3">
+                  <div className="text-xs opacity-60">
+                    Reasons
+                  </div>
+                  <ul className="mt-2 list-disc pl-5 text-sm">
+                    {(analysis.vol2vol?.reasons ?? []).map(
+                      (reason, index) => (
+                        <li key={`${reason}-${index}`}>
+                          {reason}
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-3 font-semibold">
+                  Vol2Vol State
+                </h3>
+
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Previous State
+                    </div>
+                    <div className="font-semibold">
+                      {analysis.previousState ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Current State
+                    </div>
+                    <div className="font-semibold">
+                      {analysis.vol2volState?.state ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Action
+                    </div>
+                    <div className="font-semibold">
+                      {analysis.vol2volState?.action ?? '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs opacity-60">
+                      Updated
+                    </div>
+                    <div className="font-semibold">
+                      {analysis.savedState?.updatedAt ?? '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-xl border p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">
+              CME Data History
+            </h2>
+
+            <button
+              type="button"
+              onClick={loadHistory}
+              className="rounded-md border px-3 py-1.5 text-sm"
+            >
+              Refresh
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2">Date</th>
+                  <th className="p-2">Settlement</th>
+                  <th className="p-2">Volume</th>
+                  <th className="p-2">OI</th>
+                  <th className="p-2">OI Δ</th>
+                  <th className="p-2">OI Z</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {history.map((item) => (
+                  <tr
+                    key={item.id}
+                    className="border-b"
+                  >
+                    <td className="p-2">
+                      {item.dataDate}
+                    </td>
+                    <td className="p-2">
+                      {item.settlementPrice ?? '-'}
+                    </td>
+                    <td className="p-2">
+                      {item.volume ?? '-'}
+                    </td>
+                    <td className="p-2">
+                      {item.openInterest ?? '-'}
+                    </td>
+                    <td className="p-2">
+                      {item.oiChange ?? '-'}
+                    </td>
+                    <td className="p-2">
+                      {item.oiZscore ?? '-'}
+                    </td>
+                  </tr>
+                ))}
+
+                {history.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="p-6 text-center opacity-60"
+                    >
+                      No CME data
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  )
+}

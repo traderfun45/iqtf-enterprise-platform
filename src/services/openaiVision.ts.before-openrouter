@@ -1,0 +1,135 @@
+import OpenAI from "openai"
+import fs from "node:fs/promises"
+
+const client = new OpenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  defaultHeaders: {
+    "x-goog-api-client": "iqtf-enterprise/1.0",
+  },
+})
+
+export async function analyzeCmeImage(imagePath: string) {
+  const imageBuffer = await fs.readFile(imagePath)
+  const base64Image = imageBuffer.toString("base64")
+
+  const response = await client.chat.completions.create({
+    model: "gemini-3.6-flash",
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `
+Analyze this CME Group screenshot.
+
+First identify what type of CME screenshot this is.
+
+Possible types:
+- CME Options / Vol2Vol
+- CME COT
+- CME Futures
+- Other CME market data
+
+Extract ONLY information that is actually visible.
+
+For CME Options / Vol2Vol images, focus on:
+- as of date
+- underlying futures
+- contract symbols
+- DTE
+- future settlement
+- option series
+- strike prices
+- CALL values
+- PUT values
+- volatility settlement
+- volatility curve
+- expected range
+- settlement/reference lines
+- notable CALL/PUT concentrations
+
+IMPORTANT FOR OPTION TABLES:
+- Carefully inspect BOTH CALL and PUT columns.
+- Do NOT return only CALL values when PUT values are visible.
+- For every clearly readable concentration row, preserve the strike and option series.
+- If both CALL and PUT are visible for the same strike and series, return BOTH values.
+- Use this exact structure:
+
+"notable_call_put_concentrations": [
+  {
+    "strike": 4500,
+    "series": "OGZ6",
+    "call": 10694,
+    "put": 1261
+  }
+]
+
+- If only CALL is readable, set "put" to null.
+- If only PUT is readable, set "call" to null.
+- Never invent a CALL or PUT value.
+- If multiple option series exist at the same strike, create separate objects.
+- Read numbers directly from the image. Do not calculate or estimate.
+- Return numeric JSON values.
+- Do not assume CALL/PUT values are Volume or Open Interest unless explicitly labeled.
+- If the image is cropped, only return values that are actually readable.
+- Do not use market knowledge to fill missing values.
+
+Return these top-level JSON fields:
+
+{
+  "screenshot_type": "...",
+  "as_of_date": "...",
+  "underlying_futures": [],
+  "option_series": [],
+  "volatility_settlement": null,
+  "volatility_curve": null,
+  "expected_range": null,
+  "settlement_reference_lines": null,
+  "notable_call_put_concentrations": [],
+  "unreadable_or_missing_information": null
+}
+
+Return ONLY valid JSON.
+Do NOT use markdown.
+Do NOT use code fences.
+`,
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${base64Image}`,
+            },
+          },
+        ],
+      },
+    ],
+  })
+
+  const content = response.choices[0]?.message?.content ?? ""
+
+  if (!content) {
+    throw new Error("Gemini returned an empty response")
+  }
+
+  const cleaned = content
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim()
+
+  try {
+    return JSON.parse(cleaned)
+  } catch (error) {
+    console.error("===== INVALID GEMINI JSON =====")
+    console.error(cleaned)
+
+    throw new Error(
+      `Gemini returned invalid JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+}

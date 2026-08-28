@@ -1,0 +1,281 @@
+export type CmeVisionNormalized = {
+  screenshotType?: string
+  asOfDate?: string
+
+  underlyingFutures: Array<{    symbol: string
+    dte?: number
+    settlement?: number
+  }>
+
+  optionSeries: Array<{
+    symbol: string
+    dte?: number
+    underlying?: string
+  }>
+
+  strikesRange?: {
+    minStrike?: number
+    maxStrike?: number
+  }
+
+  notableConcentrations: Array<{
+    strike: number
+    series: string
+    type: "CALL" | "PUT"
+    value: number
+  }>
+
+  unreadableOrMissingInformation?: string
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/,/g, "").trim())
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+
+  return undefined
+}
+
+export function normalizeCmeVision(
+  input: unknown,
+): CmeVisionNormalized {
+  const source = input as Record<string, unknown>
+
+  const underlyingFutures = Array.isArray(source.underlying_futures)
+    ? source.underlying_futures
+        .map((item) => {
+          const value = item as Record<string, unknown>
+
+          const symbol =
+            typeof value.symbol === "string" ? value.symbol : ""
+
+          if (!symbol) return null
+
+          const settlement = finiteNumber(
+            value.future_settlement ?? value.settlement,
+          )
+
+          const dte = finiteNumber(value.dte)
+
+          return {
+            symbol,
+            ...(dte !== undefined ? { dte } : {}),
+            ...(settlement !== undefined ? { settlement } : {}),
+          }
+        })
+        .filter(
+          (
+            item,
+          ): item is {
+            symbol: string
+            dte?: number
+            settlement?: number
+          } => item !== null,
+        )
+    : []
+
+  const optionSeries = Array.isArray(source.option_series)
+    ? source.option_series
+        .map((item) => {
+          const value = item as Record<string, unknown>
+
+          const symbol =
+            typeof value.symbol === "string" ? value.symbol : ""
+
+          if (!symbol) return null
+
+          const dte = finiteNumber(value.dte)
+
+          const underlying =
+            typeof value.underlying === "string"
+              ? value.underlying
+              : typeof value.underlying_futures_ref === "string"
+                ? value.underlying_futures_ref
+                : undefined
+
+          return {
+            symbol,
+            ...(dte !== undefined ? { dte } : {}),
+            ...(underlying ? { underlying } : {}),
+          }
+        })
+        .filter(
+          (
+            item,
+          ): item is {
+            symbol: string
+            dte?: number
+            underlying?: string
+          } => item !== null,
+        )
+    : []
+
+  const notableConcentrations: Array<{
+    strike: number
+    series: string
+    type: "CALL" | "PUT"
+    value: number
+  }> = []
+
+  function addConcentrations(
+    sourceValues: unknown,
+    type: "CALL" | "PUT",
+  ) {
+    if (!sourceValues || typeof sourceValues !== "object") {
+      return
+    }
+
+    const values = sourceValues as Record<string, unknown>
+
+    for (const [strikeText, seriesData] of Object.entries(values)) {
+      const strike = finiteNumber(strikeText)
+
+      if (
+        strike === undefined ||
+        !seriesData ||
+        typeof seriesData !== "object"
+      ) {
+        continue
+      }
+
+      const seriesValues = seriesData as Record<string, unknown>
+
+      for (const [series, rawValue] of Object.entries(seriesValues)) {
+        const value = finiteNumber(rawValue)
+
+        if (value === undefined) {
+          continue
+        }
+
+        notableConcentrations.push({
+          strike,
+          series,
+          type,
+          value,
+        })
+      }
+    }
+  }
+
+  if (Array.isArray(source.important_volume_or_oi_concentration)) {
+    for (const item of source.important_volume_or_oi_concentration) {
+      if (!item || typeof item !== "object") {
+        continue
+      }
+
+      const point = item as Record<string, unknown>
+
+      const strike = finiteNumber(point.strike)
+      const value = finiteNumber(point.value)
+      const series =
+        typeof point.series === "string" ? point.series : ""
+      const type =
+        typeof point.type === "string"
+          ? point.type.toUpperCase()
+          : ""
+
+      if (
+        strike === undefined ||
+        value === undefined ||
+        !series ||
+        (type !== "CALL" && type !== "PUT")
+      ) {
+        continue
+      }
+
+      notableConcentrations.push({
+        strike,
+        series,
+        type: type as "CALL" | "PUT",
+        value,
+      })
+    }
+  }
+
+  addConcentrations(source.call_values, "CALL")
+  addConcentrations(source.put_values, "PUT")
+
+
+  if (Array.isArray(source.notable_data_points)) {
+    for (const item of source.notable_data_points) {
+      if (!item || typeof item !== "object") {
+        continue
+      }
+
+      const point = item as Record<string, unknown>
+      const strike = finiteNumber(point.strike)
+      const series =
+        typeof point.series === "string" ? point.series : ""
+
+      if (strike === undefined || !series) {
+        continue
+      }
+
+      const call = finiteNumber(point.call)
+      const put = finiteNumber(point.put)
+
+      if (call !== undefined) {
+        notableConcentrations.push({
+          strike,
+          series,
+          type: "CALL",
+          value: call,
+        })
+      }
+
+      if (put !== undefined) {
+        notableConcentrations.push({
+          strike,
+          series,
+          type: "PUT",
+          value: put,
+        })
+      }
+    }
+  }
+
+  const range = source.strikes_range_visible as
+    | Record<string, unknown>
+    | undefined
+
+  const minStrike = finiteNumber(range?.min_strike)
+  const maxStrike = finiteNumber(range?.max_strike)
+
+  return {
+  screenshotType:
+      typeof source.screenshot_type === "string"
+        ? source.screenshot_type
+        : typeof source.image_type === "string"
+          ? source.image_type
+          : undefined,
+
+    asOfDate:
+      typeof source.as_of_date === "string"
+        ? source.as_of_date
+        : undefined,
+
+    underlyingFutures,
+    optionSeries,
+
+    ...(minStrike !== undefined || maxStrike !== undefined
+      ? {
+          strikesRange: {
+            ...(minStrike !== undefined ? { minStrike } : {}),
+            ...(maxStrike !== undefined ? { maxStrike } : {}),
+          },
+        }
+      : {}),
+
+    notableConcentrations,
+
+    unreadableOrMissingInformation:
+      typeof source.unreadable_or_missing_information === "string"
+        ? source.unreadable_or_missing_information
+        : undefined,
+  }
+}

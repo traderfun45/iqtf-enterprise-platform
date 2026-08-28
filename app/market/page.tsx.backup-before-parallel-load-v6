@@ -1,0 +1,832 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import {
+  Activity,
+  ArrowDownRight,
+  ArrowUpRight,
+  BarChart3,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react"
+
+import {
+  getMarketSnapshot,
+  getMarketIntelligence,
+  getInstitutionalAnalysis,
+  type Quote,
+  type Intelligence,
+  type InstitutionalAnalysis,
+} from "@/lib/market"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AppShell } from "@/components/layout/app-shell"
+
+function formatPrice(value: number) {
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function formatScore(value: number) {
+  return value.toFixed(2)
+}
+
+export default function MarketPage() {
+  const [xau, setXau] = useState<Quote | null>(null)
+  const [gc, setGc] = useState<Quote | null>(null)
+  const [intelligence, setIntelligence] =
+    useState<Intelligence | null>(null)
+
+  const [institutional, setInstitutional] =
+    useState<InstitutionalAnalysis | null>(null)
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+    async function loadMarket(isInitialLoad = false) {
+      if (isInitialLoad) {
+        setLoading(true)
+      }
+
+      setError(null)
+
+      // MARKET SNAPSHOT
+      try {
+        const snapshotData = await getMarketSnapshot()
+
+        const xauData = snapshotData.data.find(
+          (item) => item.symbol === "XAUUSD"
+        )
+
+        const gcData = snapshotData.data.find(
+          (item) => item.symbol === "GC"
+        )
+
+        if (!xauData || !gcData) {
+          throw new Error("Market snapshot data unavailable")
+        }
+
+        setXau(xauData)
+        setGc(gcData)
+      } catch (snapshotErr) {
+        console.error(
+          "[Market] Snapshot load failed:",
+          snapshotErr
+        )
+      }
+
+      // MARKET INTELLIGENCE
+      try {
+        const intelligenceData = await getMarketIntelligence(
+          "XAUUSD",
+          "1h",
+          50
+        )
+
+        setIntelligence(intelligenceData)
+      } catch (intelligenceErr) {
+        console.error(
+          "[Market] Intelligence load failed:",
+          intelligenceErr
+        )
+      }
+
+      // INSTITUTIONAL ANALYSIS
+      try {
+        const institutionalData =
+          await getInstitutionalAnalysis("GC")
+
+        setInstitutional(institutionalData)
+      } catch (institutionalErr) {
+        console.error(
+          "[Market] Institutional analysis load failed:",
+          institutionalErr
+        )
+      }
+
+      if (isInitialLoad) {
+        setLoading(false)
+      }
+    }
+
+  useEffect(() => {
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const refresh = async () => {
+      if (cancelled) return
+
+      await loadMarket(false)
+
+      if (!cancelled) {
+        timer = setTimeout(refresh, 30000)
+      }
+    }
+
+    loadMarket(true).finally(() => {
+      if (!cancelled) {
+        timer = setTimeout(refresh, 30000)
+      }
+    })
+
+    return () => {
+      cancelled = true
+
+      if (timer) {
+        clearTimeout(timer)
+      }
+    }
+  }, [])
+
+  const bullish =
+    intelligence?.signal === "bullish"
+
+  const bearish =
+    intelligence?.signal === "bearish"
+
+  return (
+    <AppShell>
+      <div className="space-y-6">
+
+        {/* Header */}
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+              >
+                LIVE
+              </Badge>
+
+              <span className="text-xs text-zinc-500">
+                Market Intelligence Engine
+              </span>
+            </div>
+
+            <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+              Market Intelligence
+            </h1>
+
+            <p className="mt-1 text-sm text-zinc-500">
+              Institutional multi-asset market monitoring
+            </p>
+          </div>
+
+          <button
+            onClick={() => loadMarket(false)}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-zinc-300 transition hover:bg-white/[0.06] disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                loading ? "animate-spin" : ""
+              }`}
+            />
+            Refresh
+          </button>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <Card className="border-red-500/20 bg-red-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-sm text-red-400">
+                <Activity className="h-4 w-4" />
+                {error}
+              </div>
+
+              <p className="mt-1 text-xs text-zinc-500">
+                Make sure iqtf-enterprise API is running on port 4000.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Quotes */}
+        <div className="grid gap-4 md:grid-cols-2">
+
+          <Card className="border-white/10 bg-white/[0.03]">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="text-sm text-zinc-400">
+                  XAUUSD
+                </CardTitle>
+
+                <p className="mt-1 text-xs text-zinc-600">
+                  Gold Spot
+                </p>
+              </div>
+
+              <Badge
+                variant="outline"
+                className="border-emerald-500/20 text-emerald-400"
+              >
+                {xau?.source ?? "—"}
+              </Badge>
+            </CardHeader>
+
+            <CardContent>
+              <div className="text-3xl font-bold tracking-tight text-white">
+                {xau ? formatPrice(xau.price) : "—"}
+              </div>
+
+              <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
+                <Activity className="h-3.5 w-3.5 text-emerald-400" />
+                Live market feed
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-white/[0.03]">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="text-sm text-zinc-400">
+                  GC
+                </CardTitle>
+
+                <p className="mt-1 text-xs text-zinc-600">
+                  Gold Futures
+                </p>
+              </div>
+
+              <Badge
+                variant="outline"
+                className="border-sky-500/20 text-sky-400"
+              >
+                {gc?.source ?? "—"}
+              </Badge>
+            </CardHeader>
+
+            <CardContent>
+              <div className="text-3xl font-bold tracking-tight text-white">
+                {gc ? formatPrice(gc.price) : "—"}
+              </div>
+
+              <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
+                <BarChart3 className="h-3.5 w-3.5 text-sky-400" />
+                Futures market feed
+              </div>
+            </CardContent>
+          </Card>
+
+        </div>
+
+        {/* Intelligence */}
+        <Card className="border-white/10 bg-white/[0.03]">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base text-white">
+                XAUUSD Intelligence
+              </CardTitle>
+
+              <p className="mt-1 text-xs text-zinc-500">
+                1H analysis · {intelligence?.candleCount ?? 0} candles
+              </p>
+            </div>
+
+            <Badge
+              variant="outline"
+              className={
+                bullish
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                  : bearish
+                    ? "border-red-500/30 bg-red-500/10 text-red-400"
+                    : "border-white/10 text-zinc-400"
+              }
+            >
+              {intelligence?.signal?.toUpperCase() ?? "—"}
+            </Badge>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+              {/* Trend */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Trend
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  {intelligence?.trend.direction === "bullish" ? (
+                    <TrendingUp className="h-5 w-5 text-emerald-400" />
+                  ) : (
+                    <TrendingDown className="h-5 w-5 text-red-400" />
+                  )}
+
+                  <span className="text-lg font-semibold text-white">
+                    {intelligence?.trend.direction ?? "—"}
+                  </span>
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Score:{" "}
+                  {intelligence
+                    ? formatScore(intelligence.trend.score)
+                    : "—"}
+                </div>
+              </div>
+
+              {/* Momentum */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Momentum
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  {intelligence &&
+                  intelligence.momentum.value >= 0 ? (
+                    <ArrowUpRight className="h-5 w-5 text-emerald-400" />
+                  ) : (
+                    <ArrowDownRight className="h-5 w-5 text-red-400" />
+                  )}
+
+                  <span className="text-lg font-semibold text-white">
+                    {intelligence
+                      ? `${intelligence.momentum.value.toFixed(3)}%`
+                      : "—"}
+                  </span>
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Score:{" "}
+                  {intelligence
+                    ? formatScore(intelligence.momentum.score)
+                    : "—"}
+                </div>
+              </div>
+
+              {/* ATR */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Volatility / ATR
+                </div>
+
+                <div className="mt-3 text-lg font-semibold text-white">
+                  {intelligence
+                    ? formatPrice(intelligence.volatility.atr)
+                    : "—"}
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  ATR{" "}
+                  {intelligence
+                    ? `${intelligence.volatility.atrPercent.toFixed(3)}%`
+                    : "—"}
+                </div>
+              </div>
+
+              {/* Score */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Intelligence Score
+                </div>
+
+                <div
+                  className={`mt-3 text-2xl font-bold ${
+                    bullish
+                      ? "text-emerald-400"
+                      : bearish
+                        ? "text-red-400"
+                        : "text-zinc-300"
+                  }`}
+                >
+                  {intelligence
+                    ? formatScore(intelligence.score)
+                    : "—"}
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Range −1.00 → +1.00
+                </div>
+              </div>
+
+            </div>
+          </CardContent>
+        </Card>
+
+
+        {/* Intelligence V2 */}
+        <Card className="border-white/10 bg-white/[0.03]">
+          <CardHeader>
+            <CardTitle className="text-base text-white">
+              Intelligence V2
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+
+              {/* Volatility Regime */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Volatility Regime
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-lg font-semibold text-white">
+                    {intelligence?.volatilityRegime.regime ?? "—"}
+                  </span>
+
+                  <span className="text-xs text-zinc-500">
+                    Score{" "}
+                    {intelligence
+                      ? formatScore(intelligence.volatilityRegime.score)
+                      : "—"}
+                  </span>
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  ATR{" "}
+                  {intelligence
+                    ? `${intelligence.volatilityRegime.atrPercent.toFixed(3)}%`
+                    : "—"}
+                </div>
+              </div>
+
+              {/* Market Structure */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Market Structure
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-lg font-semibold text-white">
+                    {intelligence?.structure.direction ?? "—"}
+                  </span>
+
+                  <span className="text-xs text-zinc-500">
+                    Score{" "}
+                    {intelligence
+                      ? formatScore(intelligence.structure.score)
+                      : "—"}
+                  </span>
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Bias: {intelligence?.structure.bias ?? "—"}
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <span className="text-zinc-400">
+                    HH: {intelligence?.structure.higherHigh ? "Yes" : "No"}
+                  </span>
+                  <span className="text-zinc-400">
+                    HL: {intelligence?.structure.higherLow ? "Yes" : "No"}
+                  </span>
+                  <span className="text-zinc-400">
+                    LH: {intelligence?.structure.lowerHigh ? "Yes" : "No"}
+                  </span>
+                  <span className="text-zinc-400">
+                    LL: {intelligence?.structure.lowerLow ? "Yes" : "No"}
+                  </span>
+                </div>
+              </div>
+
+              {/* MTF Alignment */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  MTF Alignment
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-lg font-semibold text-white">
+                    {intelligence?.mtf.alignment ?? "—"}
+                  </span>
+
+                  <span className="text-xs text-zinc-500">
+                    Score{" "}
+                    {intelligence
+                      ? formatScore(intelligence.mtf.score)
+                      : "—"}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-[11px] text-zinc-600">
+                      Short Term
+                    </div>
+                    <div className="mt-1 text-sm font-medium text-white">
+                      {intelligence?.mtf.shortTerm.direction ?? "—"}
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      {intelligence
+                        ? formatScore(intelligence.mtf.shortTerm.score)
+                        : "—"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] text-zinc-600">
+                      Medium Term
+                    </div>
+                    <div className="mt-1 text-sm font-medium text-white">
+                      {intelligence?.mtf.mediumTerm.direction ?? "—"}
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      {intelligence
+                        ? formatScore(intelligence.mtf.mediumTerm.score)
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Institutional Dashboard */}
+        <Card className="border-white/10 bg-white/[0.03]">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base text-white">
+                Institutional Dashboard
+              </CardTitle>
+              <p className="mt-1 text-xs text-zinc-500">
+                CME · Vol2Vol · COT · IQTF Composite
+              </p>
+            </div>
+
+            <Badge
+              variant="outline"
+              className={
+                institutional?.summary.institutionalAlignment === "BULLISH"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                  : institutional?.summary.institutionalAlignment === "BEARISH"
+                    ? "border-red-500/30 bg-red-500/10 text-red-400"
+                    : "border-white/10 text-zinc-400"
+              }
+            >
+              {institutional?.summary.institutionalAlignment ?? "—"}
+            </Badge>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+
+              {/* IQTF Decision */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  IQTF Decision
+                </div>
+
+                <div
+                  className={
+                    institutional?.summary.decision === "LONG" ||
+                    institutional?.summary.decision === "LONG_WATCH"
+                      ? "mt-3 text-2xl font-bold text-emerald-400"
+                      : institutional?.summary.decision === "SHORT" ||
+                          institutional?.summary.decision === "SHORT_WATCH"
+                        ? "mt-3 text-2xl font-bold text-red-400"
+                        : "mt-3 text-2xl font-bold text-zinc-300"
+                  }
+                >
+                  {institutional?.summary.decision ?? "—"}
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Composite Score{" "}
+                  {institutional
+                    ? institutional.summary.compositeScore.toFixed(3)
+                    : "—"}
+                </div>
+              </div>
+
+              {/* Confidence */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Confidence
+                </div>
+
+                <div className="mt-3 text-2xl font-bold text-white">
+                  {institutional
+                    ? `${institutional.summary.confidence.toFixed(0)}%`
+                    : "—"}
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Risk State{" "}
+                  <span className="text-zinc-300">
+                    {institutional?.summary.riskState ?? "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Institutional Alignment */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Institutional Alignment
+                </div>
+
+                <div className="mt-3 text-lg font-semibold text-white">
+                  {institutional?.summary.institutionalAlignment ?? "—"}
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  CME{" "}
+                  {institutional
+                    ? institutional.summary.components.cme.toFixed(3)
+                    : "—"}
+                  {" · "}
+                  Vol2Vol{" "}
+                  {institutional
+                    ? institutional.summary.components.vol2vol.toFixed(3)
+                    : "—"}
+                </div>
+              </div>
+
+              {/* COT */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  COT Positioning
+                </div>
+
+                <div className="mt-3 text-lg font-semibold text-white">
+                  {institutional?.cot.intelligence.positioning ?? "—"}
+                </div>
+
+                <div className="mt-2 text-xs text-zinc-500">
+                  Score{" "}
+                  {institutional
+                    ? institutional.cot.intelligence.score.toFixed(3)
+                    : "—"}
+                  {" · "}
+                  Confidence{" "}
+                  {institutional?.cot.intelligence.confidence ?? "—"}
+                </div>
+              </div>
+            </div>
+
+            {/* Component Scores */}
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="mb-3 text-xs text-zinc-500">
+                IQTF Composite Components
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div>
+                  <div className="text-[11px] text-zinc-600">
+                    Market
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    {institutional
+                      ? institutional.summary.components.market.toFixed(3)
+                      : "—"}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[11px] text-zinc-600">
+                    CME
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    {institutional
+                      ? institutional.summary.components.cme.toFixed(3)
+                      : "—"}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[11px] text-zinc-600">
+                    Vol2Vol
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    {institutional
+                      ? institutional.summary.components.vol2vol.toFixed(3)
+                      : "—"}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[11px] text-zinc-600">
+                    COT
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    {institutional
+                      ? institutional.summary.components.cot.toFixed(3)
+                      : "—"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Reasons / Warnings */}
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  IQTF Reasons
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {institutional?.summary.reasons?.length ? (
+                    institutional.summary.reasons.map((reason, index) => (
+                      <div
+                        key={`reason-${index}`}
+                        className="text-sm text-zinc-300"
+                      >
+                        • {reason}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-zinc-600">
+                      —
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Warnings
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {institutional?.summary.warnings?.length ? (
+                    institutional.summary.warnings.map((warning, index) => (
+                      <div
+                        key={`warning-${index}`}
+                        className="text-sm text-amber-400"
+                      >
+                        • {warning}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-zinc-600">
+                      No active warnings
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* System */}
+        <Card className="border-white/10 bg-white/[0.03]">
+          <CardHeader>
+            <CardTitle className="text-base text-white">
+              Market Data System
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-3">
+
+              <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  XAUUSD Provider
+                </div>
+
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+
+                  <span className="text-sm font-medium text-white">
+                    {xau?.source ?? "Offline"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  GC Provider
+                </div>
+
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+
+                  <span className="text-sm font-medium text-white">
+                    {gc?.source ?? "Offline"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Intelligence Engine
+                </div>
+
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+
+                  <span className="text-sm font-medium text-white">
+                    Operational
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          </CardContent>
+        </Card>
+
+      </div>
+    </AppShell>
+  )
+}

@@ -1,0 +1,118 @@
+import OpenAI from "openai"
+import fs from "node:fs/promises"
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "x-goog-api-client": "iqtf-enterprise/1.0",
+  },
+})
+
+export async function analyzeCmeImage(imagePath: string) {
+  const imageBuffer = await fs.readFile(imagePath)
+  const base64Image = imageBuffer.toString("base64")
+
+  const response = await client.chat.completions.create({
+    model: "google/gemini-2.5-flash",
+    max_tokens: 4000,
+
+    response_format: {
+      type: "json_object",
+    },
+
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `
+Analyze this CME Group screenshot.
+
+Identify the screenshot type.
+
+Possible types:
+- CME Options / Vol2Vol
+- CME COT
+- CME Futures
+- Other CME market data
+
+Extract ONLY information actually visible in the image.
+
+For CME Options / Vol2Vol, inspect:
+
+- as of date
+- underlying futures
+- contract symbols
+- DTE
+- future settlement
+- option series
+- strike prices
+- CALL values
+- PUT values
+- volatility settlement
+- volatility curve
+- expected range
+- settlement/reference lines
+- notable CALL/PUT concentrations
+
+CONCENTRATION LIMIT:
+
+CONCENTRATION EXTRACTION:
+
+The screenshot may contain an option table with many strike rows.
+
+FIRST inspect the option table carefully.
+SECOND identify readable CALL and PUT values.
+THIRD select the most significant concentration rows.
+
+Do NOT assume the option table is absent merely because part of it is cropped.
+
+If any strike rows and CALL/PUT values are visibly readable, extract them.
+
+For each selected row preserve:
+- strike
+- series
+- call
+- put
+
+Return at most 15 concentration objects total.
+
+Prioritize:
+1. Highest CALL values.
+2. Highest PUT values.
+3. Strikes closest to the underlying futures price.
+4. Rows where both CALL and PUT are visible.
+
+Do NOT reproduce the entire table.
+
+Do NOT invent values.
+Do NOT calculate values.
+Do NOT estimate unreadable values.
+
+If only CALL is readable:
+"call": number,
+"put": null
+
+If only PUT is readable:
+"call": null,
+"put": number
+
+If both are readable:
+return both.
+
+Every concentration object MUST contain exactly:
+{
+  "strike": number,
+  "series": string,
+  "call": number | null,
+  "put": number | null
+}
+
+Never omit the "call" field.
+Never omit the "put" field.
+
+If the option table is genuinely not visible in the image, return:
+"notable_call_put_concentrations": []
+`,

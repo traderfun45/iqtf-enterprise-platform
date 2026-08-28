@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: iqtf-enterprise-api
+    runtime: node
+    buildCommand: npm install && npm run api:build
+    startCommand: npm run api:start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
