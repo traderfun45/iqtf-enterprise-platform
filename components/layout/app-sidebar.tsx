@@ -148,7 +148,7 @@ return () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-4">
+<nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
         <div className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-600">
           Workspace
         </div>
