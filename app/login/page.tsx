@@ -45,10 +45,12 @@ export default function LoginPage() {
         password,
       })
 
-      localStorage.setItem(
-        "iqtf_user",
-        JSON.stringify(result.data),
-      )
+localStorage.setItem(
+  "iqtf_user",
+  JSON.stringify(result.data),
+)
+
+window.dispatchEvent(new Event("iqtf_user_changed"))
 
       router.push("/")
     } catch (error) {

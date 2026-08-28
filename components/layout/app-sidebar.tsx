@@ -69,20 +69,40 @@ export function AppSidebar() {
   const [system, setSystem] = useState<SystemStatus | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
 
-  useEffect(() => {
-    let mounted = true
+useEffect(() => {
+  let mounted = true
 
+  function loadUser() {
     try {
       const raw = localStorage.getItem("iqtf_user")
-      if (raw) {
-        const user = JSON.parse(raw)
+
+      if (!raw) {
+        if (mounted) {
+          setIsAdmin(false)
+        }
+        return
+      }
+
+      const user = JSON.parse(raw)
+
+      if (mounted) {
         setIsAdmin(user?.role === "ADMIN")
       }
     } catch {
-      setIsAdmin(false)
+      if (mounted) {
+        setIsAdmin(false)
+      }
     }
+  }
 
-    async function loadSystem() {
+  loadUser()
+
+  window.addEventListener("iqtf_user_changed", loadUser)
+  window.addEventListener("storage", loadUser)
+
+  async function loadSystem() {
+
+
       try {
         const data = await getSystemStatus()
 
@@ -100,10 +120,14 @@ export function AppSidebar() {
 
     const timer = setInterval(loadSystem, 15000)
 
-    return () => {
-      mounted = false
-      clearInterval(timer)
-    }
+return () => {
+  mounted = false
+  clearInterval(timer)
+
+  window.removeEventListener("iqtf_user_changed", loadUser)
+  window.removeEventListener("storage", loadUser)
+}
+
   }, [])
 
   const healthy = system?.status === "healthy"
