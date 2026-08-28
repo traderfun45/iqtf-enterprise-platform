@@ -17,6 +17,14 @@ import {
 
 import { getSystemStatus, type SystemStatus } from "@/lib/system"
 
+type IQTFUser = {
+  id: number
+  email: string
+  name: string | null
+  role: string
+  created_at: string
+}
+
 const menuItems = [
   {
     label: "Dashboard",
@@ -59,6 +67,7 @@ export function AppSidebar() {
   const pathname = usePathname()
 
   const [system, setSystem] = useState<SystemStatus | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
@@ -157,49 +166,50 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Admin */}
-      {isAdmin && (
+      {userRole === "ADMIN" && (
         <div className="border-t border-white/10 p-4">
           <div className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-600">
             Administration
           </div>
 
           <div className="space-y-1">
-            <Link
-              href="/admin/cme"
-              className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200 ${
-                pathname === "/admin/cme"
-                  ? "bg-white/[0.08] text-white shadow-sm"
-                  : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"
-              }`}
-            >
-              <ChartCandlestick className="h-4 w-4 text-zinc-500 group-hover:text-zinc-300" />
-              <span>CME Data</span>
-            </Link>
+            {[
+              { label: "CME Data", href: "/admin/cme" },
+              { label: "COT Data", href: "/admin/cot" },
+              { label: "Trade Plan", href: "/admin/trade-plan" },
+            ].map((item) => {
+              const isActive = pathname === item.href
 
-            <Link
-              href="/admin/cot"
-              className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200 ${
-                pathname === "/admin/cot"
-                  ? "bg-white/[0.08] text-white shadow-sm"
-                  : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"
-              }`}
-            >
-              <Activity className="h-4 w-4 text-zinc-500 group-hover:text-zinc-300" />
-              <span>COT Data</span>
-            </Link>
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200 ${
+                    isActive
+                      ? "bg-white/[0.08] text-white shadow-sm"
+                      : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"
+                  }`}
+                >
+                  {isActive && (
+                    <span className="absolute left-0 h-5 w-0.5 rounded-full bg-emerald-400" />
+                  )}
 
-            <Link
-              href="/admin/trade-plan"
-              className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200 ${
-                pathname === "/admin/trade-plan"
-                  ? "bg-white/[0.08] text-white shadow-sm"
-                  : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"
-              }`}
-            >
-              <ShieldCheck className="h-4 w-4 text-zinc-500 group-hover:text-zinc-300" />
-              <span>Trade Plans</span>
-            </Link>
+                  <ShieldCheck
+                    className={`h-4 w-4 ${
+                      isActive
+                        ? "text-emerald-400"
+                        : "text-zinc-500 group-hover:text-zinc-300"
+                    }`}
+                  />
+
+                  <span>{item.label}</span>
+
+                  {isActive && (
+                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  )}
+                </Link>
+              )
+            })}
           </div>
         </div>
       )}
