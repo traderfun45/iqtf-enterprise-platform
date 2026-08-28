@@ -3,6 +3,32 @@ import { db } from '../db/database.js'
 import { hashPassword, verifyPassword } from '../utils/password.js'
 
 export async function userRoutes(app: FastifyInstance) {
+  // Render Free has ephemeral storage. Bootstrap the first admin
+  // from environment variables whenever the SQLite database is empty.
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase()
+  const adminPassword = process.env.ADMIN_PASSWORD
+
+  if (adminEmail && adminPassword) {
+    const existingUser = db
+      .prepare('SELECT id FROM users LIMIT 1')
+      .get() as { id: number } | undefined
+
+    if (!existingUser) {
+      if (adminPassword.length < 8) {
+        throw new Error('ADMIN_PASSWORD must be at least 8 characters')
+      }
+
+      const passwordHash = await hashPassword(adminPassword)
+
+      db.prepare(
+        `INSERT INTO users (email, name, password_hash, role)
+         VALUES (?, ?, ?, 'ADMIN')`,
+      ).run(adminEmail, 'IQTF Administrator', passwordHash)
+
+      console.log('[AUTH] Bootstrap admin created:', adminEmail)
+    }
+  }
+
   app.get('/users', async () => {
     const users = db
       .prepare(
