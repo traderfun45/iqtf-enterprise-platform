@@ -282,7 +282,10 @@ export type InstitutionalAnalysis = {
     confidence: number
     riskState: "LOW" | "NORMAL" | "ELEVATED" | "HIGH"
     compositeScore: number
+    marketAlignment: "BULLISH" | "BEARISH" | "NEUTRAL"
     institutionalAlignment: "BULLISH" | "BEARISH" | "NEUTRAL"
+    institutionalScore: number
+    signalConflict: boolean
     components: {
       market: number
       cme: number

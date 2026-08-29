@@ -205,6 +205,38 @@ export async function institutionalRoutes(
           },
         )
 
+
+      /*
+       * INSTITUTIONAL ALIGNMENT V3
+       *
+       * Institutional alignment uses CME + Vol2Vol + COT.
+       * Market score is intentionally excluded.
+       */
+
+      const institutionalScore =
+        cme.confirmationScore * 0.25 +
+        (vol2vol.score / 100) * 0.25 +
+        (cot.score / 3) * 0.15
+
+      const institutionalAlignment =
+        institutionalScore > 0.25
+          ? 'BULLISH'
+          : institutionalScore < -0.25
+            ? 'BEARISH'
+            : 'NEUTRAL'
+
+      const marketAlignment =
+        marketIntelligence.intelligence.score > 0.25
+          ? 'BULLISH'
+          : marketIntelligence.intelligence.score < -0.25
+            ? 'BEARISH'
+            : 'NEUTRAL'
+
+      const signalConflict =
+        marketAlignment !== 'NEUTRAL' &&
+        institutionalAlignment !== 'NEUTRAL' &&
+        marketAlignment !== institutionalAlignment
+
       const iqtfDecision =
         calculateIqtfDecision({
           marketScore:
@@ -263,14 +295,12 @@ export async function institutionalRoutes(
             riskState: iqtfDecision.riskState,
             compositeScore: iqtfDecision.compositeScore,
 
-            institutionalAlignment:
-              iqtfDecision.compositeScore > 0.25
-                ? 'BULLISH'
-                : iqtfDecision.compositeScore < -0.25
-                  ? 'BEARISH'
-                  : 'NEUTRAL',
+            marketAlignment,
+            institutionalAlignment,
+            institutionalScore,
+            signalConflict,
 
-            components: iqtfDecision.components,
+components: iqtfDecision.components,
             reasons: iqtfDecision.reasons,
             warnings: iqtfDecision.warnings,
           },

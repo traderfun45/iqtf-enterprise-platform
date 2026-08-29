@@ -57,3 +57,12 @@ next-env.d.ts
 
 # IQTF production runtime
 /logs/
+
+# IQTF local backup files
+*.backup
+*.backup-*
+*.bak
+*.before-cloudflare
+
+# IQTF test output
+/iqtf-institutional-v3.json

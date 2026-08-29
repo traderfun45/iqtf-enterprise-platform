@@ -85,7 +85,7 @@ export function calculateIqtfDecision(params: {
   )
 
   const cot = clamp(
-    params.cotScore ?? 0,
+    (params.cotScore ?? 0) / 3,
     -1,
     1,
   )
@@ -250,13 +250,44 @@ export function calculateIqtfDecision(params: {
     Number(vol2vol < -0.25) +
     Number(cot < -0.25)
 
-  if (
+  const hasConflictingSignals =
     bullishComponents > 0 &&
     bearishComponents > 0
-  ) {
+
+  if (hasConflictingSignals) {
     warnings.push(
       'Market, CME, Vol2Vol and COT signals are conflicting',
     )
+  }
+
+  /* FINAL RISK OVERRIDE */
+
+  if (
+    params.volatilityRegime === 'HIGH' ||
+    hasConflictingSignals
+  ) {
+    riskState = 'HIGH'
+  } else if (
+    params.volatilityRegime === 'ELEVATED' ||
+    params.cmeOiConfirmation === 'INSUFFICIENT_DATA'
+  ) {
+    if (riskState === 'LOW' || riskState === 'NORMAL') {
+      riskState = 'ELEVATED'
+    }
+  }
+
+  /* NO-TRADE EXPLANATION */
+
+  if (decision === 'NO_TRADE') {
+    if (hasConflictingSignals) {
+      reasons.push(
+        'Trade permission denied because Market and Institutional signals are conflicting',
+      )
+    } else {
+      reasons.push(
+        'Trade permission denied because composite score is below the trade threshold',
+      )
+    }
   }
 
   return {
