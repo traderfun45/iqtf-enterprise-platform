@@ -1,5 +1,5 @@
 export interface Env {
-  DB?: D1Database
+  DB?: unknown
 }
 
 function json(data: unknown, status = 200): Response {
