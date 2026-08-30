@@ -94,6 +94,7 @@ export async function cmeRoutes(
 await fs.writeFile(tempPath, imageBuffer)
 
 try {
+  console.log('CME OCR: calling Vision...')
   const visionResult = await analyzeCmeImage(tempPath)
 console.log(
   'CME RAW VISION:',
