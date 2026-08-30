@@ -419,10 +419,19 @@ const vol2volState =
                 outputsize: 50,
               })
 
-              return {
-                intelligence: calculateMarketIntelligence(candles),
-                candleCount: candles.length,
-              }
+const orderedCandles = [...candles].sort(
+  (a, b) =>
+    new Date(a.timestamp).getTime() -
+    new Date(b.timestamp).getTime(),
+)
+
+return {
+  intelligence: calculateMarketIntelligence(candles),
+  currentPrice:
+    orderedCandles[orderedCandles.length - 1].close,
+  candleCount: candles.length,
+}
+
             },
           )
 
@@ -434,6 +443,18 @@ const vol2volState =
               intelligence.confirmationScore,
             vol2volScore:
               vol2vol.score,
+            marketSignal:
+              marketIntelligence.intelligence.signal,
+            marketStructure:
+              marketIntelligence.intelligence.structure.direction,
+            volatilityRegime:
+              marketIntelligence.intelligence.volatilityRegime.regime,
+            cmePositioning:
+              intelligence.positioning,
+            cmeOiConfirmation:
+              intelligence.oiConfirmation,
+            vol2volSignal:
+              vol2vol.signal,
           })
 
       return {

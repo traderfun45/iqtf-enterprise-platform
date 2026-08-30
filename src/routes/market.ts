@@ -261,11 +261,20 @@ try {
               interval,
               outputsize
             })
+const orderedCandles = [...candles].sort(
+  (a, b) =>
+    new Date(a.timestamp).getTime() -
+    new Date(b.timestamp).getTime(),
+)
 
-            return {
-              intelligence: calculateMarketIntelligence(candles),
-              candleCount: candles.length
-            }
+return {
+  intelligence: calculateMarketIntelligence(candles),
+  currentPrice:
+    orderedCandles[orderedCandles.length - 1].close,
+  candleCount: candles.length
+}
+
+
           }
         )
 

@@ -2,6 +2,7 @@ import type { MarketIntelligence } from './intelligence.js'
 
 export type CachedMarketIntelligence = {
   intelligence: MarketIntelligence
+  currentPrice: number
   candleCount: number
 }
 
