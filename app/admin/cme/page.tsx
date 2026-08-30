@@ -93,7 +93,94 @@ export default function CmeAdminPage() {
   setMessage(`Image selected: ${file.name}`)
 }
 
-  async function loadAnalysis() {
+ async function handleScanImage() {
+  if (!selectedImage) {
+    setMessage('Please select a CME screenshot first')
+    return
+  }
+
+  setLoading(true)
+  setMessage('Scanning CME screenshot...')
+
+  try {
+    const buffer = await selectedImage.arrayBuffer()
+
+    let binary = ''
+    const bytes = new Uint8Array(buffer)
+
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+
+    const base64 = btoa(binary)
+
+    const response = await fetch(`${API}/api/cme/ocr`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image: base64,
+      }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.error ?? 'OCR failed')
+    }
+
+    const data = result.data ?? {}
+
+    setForm((current) => ({
+      ...current,
+
+      symbol: data.symbol ?? current.symbol,
+      dataDate: data.dataDate ?? current.dataDate,
+      dataTime: data.dataTime ?? current.dataTime,
+
+      settlementPrice:
+        data.settlementPrice ?? current.settlementPrice,
+
+      volume:
+        data.volume ?? current.volume,
+
+      volumeZscore:
+        data.volumeZscore ?? current.volumeZscore,
+
+      openInterest:
+        data.openInterest ?? current.openInterest,
+
+      oiChange:
+        data.oiChange ?? current.oiChange,
+
+      oiZscore:
+        data.oiZscore ?? current.oiZscore,
+
+      source: data.source ?? 'CME',
+
+      inputMethod: 'OCR',
+      imageReference: selectedImage.name,
+
+      note:
+        data.note ??
+        current.note,
+    }))
+
+    setMessage('CME screenshot scanned successfully')
+  } catch (error) {
+    setMessage(
+      error instanceof Error
+        ? error.message
+        : 'OCR processing failed',
+    )
+  } finally {
+    setLoading(false)
+  }
+}
+
+ async function loadAnalysis() {
+
     try {
       const response = await fetch(
         `${API}/api/cme/analysis?symbol=${form.symbol}`,
@@ -398,6 +485,17 @@ export default function CmeAdminPage() {
     </div>
   )}
 </div>
+
+{selectedImage && (
+  <button
+    type="button"
+    onClick={handleScanImage}
+    disabled={loading}
+    className="rounded-md border px-5 py-2 font-medium"
+  >
+    {loading ? 'Scanning...' : 'Scan CME Screenshot'}
+  </button>
+)}
 
             <div className="md:col-span-2">
               <button
