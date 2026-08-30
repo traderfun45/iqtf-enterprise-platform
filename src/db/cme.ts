@@ -80,6 +80,11 @@ export function createCmeMarketData(
 
   const id = Number(result.lastInsertRowid)
 
+  // สำคัญ:
+  // หลังเพิ่มข้อมูลใหม่ ให้คำนวณข้อมูล CME ใหม่ทั้งชุด
+  // เพื่อรองรับการ insert ข้อมูลย้อนหลัง
+  recalculateCmeDerivedData(data.symbol)
+
   return getCmeMarketDataById(id)!
 }
 
@@ -128,4 +133,131 @@ export function getCmeMarketDataHistory(
     .all(symbol, limit) as any[]
 
   return rows.map(mapRow)
+}
+
+/**
+ * Recalculate derived CME fields.
+ *
+ * IMPORTANT:
+ * History is processed ASCENDING by date.
+ * This means:
+ *
+ * 24/8 -> 25/8 -> 26/8 -> 27/8 -> 28/8
+ *
+ * Therefore:
+ *
+ * oiChange(25/8) = OI(25/8) - OI(24/8)
+ * oiChange(26/8) = OI(26/8) - OI(25/8)
+ *
+ * and NOT based on insertion order.
+ */
+export function recalculateCmeDerivedData(
+  symbol = 'GC',
+): void {
+  const rows = db
+    .prepare(`
+      SELECT *
+      FROM cme_market_data
+      WHERE symbol = ?
+      ORDER BY data_date ASC, data_time ASC, id ASC
+    `)
+    .all(symbol) as any[]
+
+  if (rows.length === 0) {
+    return
+  }
+
+  let previousVolume: number | undefined
+  let previousOI: number | undefined
+
+  const update = db.prepare(`
+    UPDATE cme_market_data
+    SET
+      oi_change = ?,
+      volume_zscore = ?,
+      oi_zscore = ?
+    WHERE id = ?
+  `)
+
+  const volumeChanges: number[] = []
+  const oiChanges: number[] = []
+
+  for (const row of rows) {
+    let volumeChange: number | null = null
+    let oiChange: number | null = null
+
+    if (
+      row.volume != null &&
+      previousVolume != null
+    ) {
+      volumeChange = Number(row.volume) - previousVolume
+      volumeChanges.push(volumeChange)
+    }
+
+    if (
+      row.open_interest != null &&
+      previousOI != null
+    ) {
+      oiChange = Number(row.open_interest) - previousOI
+      oiChanges.push(oiChange)
+    }
+
+    /*
+     * Z-score uses historical changes available BEFORE
+     * the current record.
+     *
+     * With insufficient history => 0.
+     */
+    const volumeZscore =
+      volumeChange != null
+        ? calculateZScore(volumeChange, volumeChanges.slice(0, -1))
+        : 0
+
+    const oiZscore =
+      oiChange != null
+        ? calculateZScore(oiChange, oiChanges.slice(0, -1))
+        : 0
+
+    update.run(
+      oiChange,
+      volumeZscore,
+      oiZscore,
+      row.id,
+    )
+
+    if (row.volume != null) {
+      previousVolume = Number(row.volume)
+    }
+
+    if (row.open_interest != null) {
+      previousOI = Number(row.open_interest)
+    }
+  }
+}
+
+function calculateZScore(
+  value: number,
+  history: number[],
+): number {
+  if (history.length < 2) {
+    return 0
+  }
+
+  const mean =
+    history.reduce((sum, x) => sum + x, 0) /
+    history.length
+
+  const variance =
+    history.reduce(
+      (sum, x) => sum + Math.pow(x - mean, 2),
+      0,
+    ) / history.length
+
+  const stdDev = Math.sqrt(variance)
+
+  if (stdDev === 0) {
+    return 0
+  }
+
+  return (value - mean) / stdDev
 }
