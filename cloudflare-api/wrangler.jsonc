@@ -8,5 +8,12 @@
   ],
   "observability": {
     "enabled": true
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "iqtf-db",
+      "database_id": "d6595c6a-a887-4120-99de-bcb061ad84d1"
+    }
+  ]
 }
