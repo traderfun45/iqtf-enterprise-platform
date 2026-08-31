@@ -1094,6 +1094,461 @@ export default {
     }
 
     // =========================================================
+    // TRADE PLAN
+    // =========================================================
+
+    // POST /api/trade-plan
+    if (
+      url.pathname === '/api/trade-plan' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const body = await request.json() as {
+          symbol?: string
+          direction?: 'LONG' | 'SHORT'
+          entryPrice?: number
+          stopLoss?: number
+          tp1?: number
+          tp2?: number
+          tp3?: number
+          status?: 'ACTIVE' | 'CLOSED' | 'CANCELLED'
+          note?: string
+          createdBy?: string
+        }
+
+        const symbol = String(body.symbol ?? 'GC').trim().toUpperCase()
+        const direction = body.direction
+        const entryPrice = Number(body.entryPrice)
+        const stopLoss = Number(body.stopLoss)
+        const tp1 = Number(body.tp1)
+        const tp2 = Number(body.tp2)
+        const tp3 = Number(body.tp3)
+        const status = body.status ?? 'ACTIVE'
+
+        if (!direction || !['LONG', 'SHORT'].includes(direction)) {
+          return json({
+            success: false,
+            error: 'direction must be LONG or SHORT',
+          }, 400)
+        }
+
+        if (
+          !Number.isFinite(entryPrice) ||
+          !Number.isFinite(stopLoss) ||
+          !Number.isFinite(tp1) ||
+          !Number.isFinite(tp2) ||
+          !Number.isFinite(tp3)
+        ) {
+          return json({
+            success: false,
+            error: 'entryPrice, stopLoss, tp1, tp2 and tp3 must be valid numbers',
+          }, 400)
+        }
+
+        if (!['ACTIVE', 'CLOSED', 'CANCELLED'].includes(status)) {
+          return json({
+            success: false,
+            error: 'Invalid trade plan status',
+          }, 400)
+        }
+
+        const result = await env.DB.prepare(`
+          INSERT INTO trade_plans (
+            symbol,
+            direction,
+            entry_price,
+            stop_loss,
+            tp1,
+            tp2,
+            tp3,
+            status,
+            note,
+            created_by
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING *
+        `)
+          .bind(
+            symbol,
+            direction,
+            entryPrice,
+            stopLoss,
+            tp1,
+            tp2,
+            tp3,
+            status,
+            body.note ? String(body.note) : null,
+            body.createdBy ? String(body.createdBy) : null,
+          )
+          .first()
+
+        return json({
+          success: true,
+          data: result,
+        }, 201)
+      } catch (error) {
+        console.error('POST /api/trade-plan error:', error)
+
+        return json({
+          success: false,
+          error: 'Failed to create trade plan',
+        }, 400)
+      }
+    }
+
+    // GET /api/trade-plan/latest
+    if (
+      url.pathname === '/api/trade-plan/latest' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const symbol =
+          url.searchParams.get('symbol')?.trim().toUpperCase() || 'GC'
+
+        const result = await env.DB.prepare(`
+          SELECT *
+          FROM trade_plans
+          WHERE symbol = ?
+          ORDER BY created_at DESC, id DESC
+          LIMIT 1
+        `)
+          .bind(symbol)
+          .first()
+
+        if (!result) {
+          return json({
+            success: false,
+            error: 'No trade plan available',
+          }, 404)
+        }
+
+        return json({
+          success: true,
+          data: result,
+        })
+      } catch (error) {
+        console.error('GET /api/trade-plan/latest error:', error)
+
+        return json({
+          success: false,
+          error: 'Failed to read latest trade plan',
+        }, 500)
+      }
+    }
+
+    // GET /api/trade-plan/history
+    if (
+      url.pathname === '/api/trade-plan/history' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const symbol =
+          url.searchParams.get('symbol')?.trim().toUpperCase() || 'GC'
+
+        const limitParam = Number(
+          url.searchParams.get('limit') || '30',
+        )
+
+        const limit = Math.min(
+          Math.max(
+            Number.isFinite(limitParam) ? Math.floor(limitParam) : 30,
+            1,
+          ),
+          100,
+        )
+
+        const result = await env.DB.prepare(`
+          SELECT *
+          FROM trade_plans
+          WHERE symbol = ?
+          ORDER BY created_at DESC, id DESC
+          LIMIT ?
+        `)
+          .bind(symbol, limit)
+          .all()
+
+        return json({
+          success: true,
+          symbol,
+          count: result.results.length,
+          data: result.results,
+        })
+      } catch (error) {
+        console.error('GET /api/trade-plan/history error:', error)
+
+        return json({
+          success: false,
+          error: 'Failed to read trade plan history',
+        }, 500)
+      }
+    }
+
+    // GET /api/trade-plan/:id
+    if (
+      url.pathname.startsWith('/api/trade-plan/') &&
+      request.method === 'GET'
+    ) {
+      try {
+        const idText = url.pathname.split('/').pop() || ''
+        const id = Number(idText)
+
+        if (!Number.isInteger(id)) {
+          return json({
+            success: false,
+            error: 'Invalid trade plan id',
+          }, 400)
+        }
+
+        const result = await env.DB.prepare(`
+          SELECT *
+          FROM trade_plans
+          WHERE id = ?
+          LIMIT 1
+        `)
+          .bind(id)
+          .first()
+
+        if (!result) {
+          return json({
+            success: false,
+            error: 'Trade plan not found',
+          }, 404)
+        }
+
+        return json({
+          success: true,
+          data: result,
+        })
+      } catch (error) {
+        console.error('GET /api/trade-plan/:id error:', error)
+
+        return json({
+          success: false,
+          error: 'Failed to read trade plan',
+        }, 500)
+      }
+    }
+
+    // PUT /api/trade-plan/:id
+    if (
+      url.pathname.startsWith('/api/trade-plan/') &&
+      request.method === 'PUT'
+    ) {
+      try {
+        const idText = url.pathname.split('/').pop() || ''
+        const id = Number(idText)
+
+        if (!Number.isInteger(id)) {
+          return json({
+            success: false,
+            error: 'Invalid trade plan id',
+          }, 400)
+        }
+
+        const body = await request.json() as {
+          symbol?: string
+          direction?: 'LONG' | 'SHORT'
+          entryPrice?: number
+          stopLoss?: number
+          tp1?: number
+          tp2?: number
+          tp3?: number
+          status?: 'ACTIVE' | 'CLOSED' | 'CANCELLED'
+          note?: string | null
+        }
+
+        const existing = await env.DB.prepare(`
+          SELECT *
+          FROM trade_plans
+          WHERE id = ?
+          LIMIT 1
+        `)
+          .bind(id)
+          .first<{
+            symbol: string
+            direction: 'LONG' | 'SHORT'
+            entry_price: number
+            stop_loss: number
+            tp1: number
+            tp2: number
+            tp3: number
+            status: 'ACTIVE' | 'CLOSED' | 'CANCELLED'
+            note: string | null
+          }>()
+
+        if (!existing) {
+          return json({
+            success: false,
+            error: 'Trade plan not found',
+          }, 404)
+        }
+
+        const symbol =
+          body.symbol !== undefined
+            ? String(body.symbol).trim().toUpperCase()
+            : existing.symbol
+
+        const direction =
+          body.direction ?? existing.direction
+
+        const entryPrice =
+          body.entryPrice !== undefined
+            ? Number(body.entryPrice)
+            : existing.entry_price
+
+        const stopLoss =
+          body.stopLoss !== undefined
+            ? Number(body.stopLoss)
+            : existing.stop_loss
+
+        const tp1 =
+          body.tp1 !== undefined
+            ? Number(body.tp1)
+            : existing.tp1
+
+        const tp2 =
+          body.tp2 !== undefined
+            ? Number(body.tp2)
+            : existing.tp2
+
+        const tp3 =
+          body.tp3 !== undefined
+            ? Number(body.tp3)
+            : existing.tp3
+
+        const status =
+          body.status ?? existing.status
+
+        const note =
+          body.note !== undefined
+            ? body.note
+            : existing.note
+
+        if (!['LONG', 'SHORT'].includes(direction)) {
+          return json({
+            success: false,
+            error: 'direction must be LONG or SHORT',
+          }, 400)
+        }
+
+        if (
+          !Number.isFinite(entryPrice) ||
+          !Number.isFinite(stopLoss) ||
+          !Number.isFinite(tp1) ||
+          !Number.isFinite(tp2) ||
+          !Number.isFinite(tp3)
+        ) {
+          return json({
+            success: false,
+            error: 'Trade prices must be valid numbers',
+          }, 400)
+        }
+
+        if (!['ACTIVE', 'CLOSED', 'CANCELLED'].includes(status)) {
+          return json({
+            success: false,
+            error: 'Invalid trade plan status',
+          }, 400)
+        }
+
+        const result = await env.DB.prepare(`
+          UPDATE trade_plans
+          SET
+            symbol = ?,
+            direction = ?,
+            entry_price = ?,
+            stop_loss = ?,
+            tp1 = ?,
+            tp2 = ?,
+            tp3 = ?,
+            status = ?,
+            note = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+          RETURNING *
+        `)
+          .bind(
+            symbol,
+            direction,
+            entryPrice,
+            stopLoss,
+            tp1,
+            tp2,
+            tp3,
+            status,
+            note,
+            id,
+          )
+          .first()
+
+        return json({
+          success: true,
+          data: result,
+        })
+      } catch (error) {
+        console.error('PUT /api/trade-plan/:id error:', error)
+
+        return json({
+          success: false,
+          error: 'Failed to update trade plan',
+        }, 400)
+      }
+    }
+
+    // DELETE /api/trade-plan/:id
+    if (
+      url.pathname.startsWith('/api/trade-plan/') &&
+      request.method === 'DELETE'
+    ) {
+      try {
+        const idText = url.pathname.split('/').pop() || ''
+        const id = Number(idText)
+
+        if (!Number.isInteger(id)) {
+          return json({
+            success: false,
+            error: 'Invalid trade plan id',
+          }, 400)
+        }
+
+        const existing = await env.DB.prepare(`
+          SELECT id
+          FROM trade_plans
+          WHERE id = ?
+          LIMIT 1
+        `)
+          .bind(id)
+          .first()
+
+        if (!existing) {
+          return json({
+            success: false,
+            error: 'Trade plan not found',
+          }, 404)
+        }
+
+        await env.DB.prepare(`
+          DELETE FROM trade_plans
+          WHERE id = ?
+        `)
+          .bind(id)
+          .run()
+
+        return json({
+          success: true,
+          id,
+        })
+      } catch (error) {
+        console.error('DELETE /api/trade-plan/:id error:', error)
+
+        return json({
+          success: false,
+          error: 'Failed to delete trade plan',
+        }, 500)
+      }
+    }
+
+    // =========================================================
     // 404
     // =========================================================
     return json(
