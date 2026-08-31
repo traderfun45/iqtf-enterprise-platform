@@ -15,15 +15,15 @@ function calculateZScore(
   value: number,
   history: number[],
 ): number {
-  if (history.length < 2) {
+  // Not enough historical observations
+  // to produce a reliable Z-score.
+  if (history.length < 3) {
     return 0
   }
 
   const mean =
-    history.reduce(
-      (sum, x) => sum + x,
-      0,
-    ) / history.length
+    history.reduce((sum, x) => sum + x, 0) /
+    history.length
 
   const variance =
     history.reduce(
