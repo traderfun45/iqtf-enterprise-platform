@@ -3,7 +3,7 @@ name: Deploy IQTF to Cloudflare Workers
 on:
   push:
     branches:
-      - cloudflare-migration
+      - main
   workflow_dispatch:
 
 jobs:
