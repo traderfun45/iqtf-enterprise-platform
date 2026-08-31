@@ -11,6 +11,37 @@ function json(data: unknown, status = 200): Response {
   })
 }
 
+function calculateZScore(
+  value: number,
+  history: number[],
+): number {
+  if (history.length < 2) {
+    return 0
+  }
+
+  const mean =
+    history.reduce(
+      (sum, x) => sum + x,
+      0,
+    ) / history.length
+
+  const variance =
+    history.reduce(
+      (sum, x) =>
+        sum + Math.pow(x - mean, 2),
+      0,
+    ) / history.length
+
+  const stdDev = Math.sqrt(variance)
+
+  if (stdDev === 0) {
+    return 0
+  }
+
+  return (value - mean) / stdDev
+}
+
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -178,6 +209,141 @@ export default {
           {
             success: false,
             error: 'Failed to insert CME data',
+          },
+          500,
+        )
+      }
+    }
+
+    // =========================================================
+    // POST /api/cme/recalculate
+    // =========================================================
+    if (
+      url.pathname === '/api/cme/recalculate' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const symbol = url.searchParams.get('symbol') || 'GC'
+
+        const rows = await env.DB.prepare(`
+          SELECT
+            id,
+            volume,
+            open_interest
+          FROM cme_market_data
+          WHERE symbol = ?
+          ORDER BY data_date ASC, data_time ASC, id ASC
+        `)
+          .bind(symbol)
+          .all()
+
+        let previousVolume: number | null = null
+        let previousOI: number | null = null
+
+        const volumeChanges: number[] = []
+        const oiChanges: number[] = []
+
+        const updates: Promise<unknown>[] = []
+
+        for (const row of rows.results as Array<{
+          id: number
+          volume: number | null
+          open_interest: number | null
+        }>) {
+          let volumeChange: number | null = null
+          let oiChange: number | null = null
+
+          if (
+            row.volume != null &&
+            previousVolume != null
+          ) {
+            volumeChange =
+              Number(row.volume) - previousVolume
+
+            volumeChanges.push(volumeChange)
+          }
+
+          if (
+            row.open_interest != null &&
+            previousOI != null
+          ) {
+            oiChange =
+              Number(row.open_interest) - previousOI
+
+            oiChanges.push(oiChange)
+          }
+
+          const volumeHistory =
+            volumeChange != null
+              ? volumeChanges.slice(0, -1)
+              : []
+
+          const oiHistory =
+            oiChange != null
+              ? oiChanges.slice(0, -1)
+              : []
+
+          const volumeZscore =
+            volumeChange != null
+              ? calculateZScore(
+                  volumeChange,
+                  volumeHistory,
+                )
+              : null
+
+          const oiZscore =
+            oiChange != null
+              ? calculateZScore(
+                  oiChange,
+                  oiHistory,
+                )
+              : null
+
+          updates.push(
+            env.DB.prepare(`
+              UPDATE cme_market_data
+              SET
+                oi_change = ?,
+                volume_zscore = ?,
+                oi_zscore = ?,
+                updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `)
+              .bind(
+                oiChange,
+                volumeZscore,
+                oiZscore,
+                row.id,
+              )
+              .run(),
+          )
+
+          if (row.volume != null) {
+            previousVolume = Number(row.volume)
+          }
+
+          if (row.open_interest != null) {
+            previousOI = Number(row.open_interest)
+          }
+        }
+
+        await Promise.all(updates)
+
+        return json({
+          success: true,
+          symbol,
+          count: rows.results.length,
+        })
+      } catch (error) {
+        console.error(
+          'POST /api/cme/recalculate error:',
+          error,
+        )
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to recalculate CME data',
           },
           500,
         )
