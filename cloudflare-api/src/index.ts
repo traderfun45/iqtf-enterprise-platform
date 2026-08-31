@@ -123,6 +123,38 @@ export default {
     }
 
     // =========================================================
+    // GET /api/cme/duplicates
+    // =========================================================
+    if (
+      url.pathname === '/api/cme/duplicates' &&
+      request.method === 'GET'
+    ) {
+      const symbol = url.searchParams.get('symbol') || 'GC'
+
+      const result = await env.DB.prepare(`
+        SELECT
+          symbol,
+          data_date,
+          data_time,
+          COUNT(*) AS count
+        FROM cme_market_data
+        WHERE symbol = ?
+        GROUP BY symbol, data_date, data_time
+        HAVING COUNT(*) > 1
+        ORDER BY data_date DESC, data_time DESC
+      `)
+        .bind(symbol)
+        .all()
+
+      return json({
+        success: true,
+        symbol,
+        count: result.results.length,
+        data: result.results,
+      })
+    }
+
+    // =========================================================
     // POST /api/cme
     // =========================================================
     if (
