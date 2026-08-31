@@ -66,7 +66,10 @@ export default {
       )
 
       const limit = Math.min(
-        Math.max(Number.isFinite(limitParam) ? limitParam : 30, 1),
+        Math.max(
+          Number.isFinite(limitParam) ? limitParam : 30,
+          1,
+        ),
         100,
       )
 
@@ -88,6 +91,102 @@ export default {
       })
     }
 
+    // =========================================================
+    // POST /api/cme
+    // =========================================================
+    if (
+      url.pathname === '/api/cme' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const body = await request.json() as {
+          symbol?: string
+          dataDate?: string
+          dataTime?: string
+          settlementPrice?: number
+          volume?: number
+          volumeZscore?: number
+          openInterest?: number
+          oiChange?: number
+          oiZscore?: number
+          source?: string
+          note?: string
+          createdBy?: string
+          inputMethod?: string
+          imageReference?: string
+        }
+
+        if (!body.symbol || !body.dataDate) {
+          return json(
+            {
+              success: false,
+              error: 'symbol and dataDate are required',
+            },
+            400,
+          )
+        }
+
+        const result = await env.DB.prepare(`
+          INSERT INTO cme_market_data (
+            symbol,
+            data_date,
+            data_time,
+            settlement_price,
+            volume,
+            volume_zscore,
+            open_interest,
+            oi_change,
+            oi_zscore,
+            source,
+            note,
+            created_by,
+            input_method,
+            image_reference
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING *
+        `)
+          .bind(
+            body.symbol,
+            body.dataDate,
+            body.dataTime ?? null,
+            body.settlementPrice ?? null,
+            body.volume ?? null,
+            body.volumeZscore ?? null,
+            body.openInterest ?? null,
+            body.oiChange ?? null,
+            body.oiZscore ?? null,
+            body.source ?? 'CME',
+            body.note ?? null,
+            body.createdBy ?? null,
+            body.inputMethod ?? 'MANUAL',
+            body.imageReference ?? null,
+          )
+          .first()
+
+        return json(
+          {
+            success: true,
+            data: result,
+          },
+          201,
+        )
+      } catch (error) {
+        console.error('POST /api/cme error:', error)
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to insert CME data',
+          },
+          500,
+        )
+      }
+    }
+
+    // =========================================================
+    // 404
+    // =========================================================
     return json(
       {
         success: false,
