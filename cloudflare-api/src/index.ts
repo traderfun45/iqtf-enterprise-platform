@@ -383,6 +383,42 @@ export default {
     }
 
     // =========================================================
+    // GET /api/cme/schema
+    // =========================================================
+    if (
+      url.pathname === '/api/cme/schema' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const result = await env.DB.prepare(`
+          SELECT
+            name,
+            type,
+            sql
+          FROM sqlite_master
+          WHERE type IN ('table', 'index')
+            AND name LIKE 'cme_market_data%'
+          ORDER BY type, name
+        `).all()
+
+        return json({
+          success: true,
+          data: result.results,
+        })
+      } catch (error) {
+        console.error('GET /api/cme/schema error:', error)
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to read CME schema',
+          },
+          500,
+        )
+      }
+    }
+
+    // =========================================================
     // 404
     // =========================================================
     return json(
