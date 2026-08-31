@@ -14,11 +14,11 @@ function json(data: unknown, status = 200): Response {
 function calculateZScore(
   value: number,
   history: number[],
-): number {
+): number | null {
   // Not enough historical observations
   // to produce a reliable Z-score.
   if (history.length < 3) {
-    return 0
+    return null
   }
 
   const mean =
@@ -34,8 +34,9 @@ function calculateZScore(
 
   const stdDev = Math.sqrt(variance)
 
+  // No variation in historical observations.
   if (stdDev === 0) {
-    return 0
+    return null
   }
 
   return (value - mean) / stdDev
