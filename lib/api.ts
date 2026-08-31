@@ -1,6 +1,6 @@
 export const API =
   process.env.NEXT_PUBLIC_API_URL ??
-  "https://iqtf-enterprise-api.onrender.com"
+  "https://iqtf-enterprise-api.traderfun45.workers.dev"
 
 const DEFAULT_TIMEOUT_MS = 8000
 
