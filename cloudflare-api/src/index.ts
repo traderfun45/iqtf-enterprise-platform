@@ -93,7 +93,7 @@ function cmeZScore(
 
   const std = Math.sqrt(variance)
 
-  if (std === 0) return 0
+  if (std === 0) return null
 
   return (value - mean) / std
 }
