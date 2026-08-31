@@ -673,6 +673,426 @@ export default {
       }
     }
 
+
+    // =========================================================
+    // GET /api/cot/latest
+    // =========================================================
+    if (
+      url.pathname === '/api/cot/latest' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const symbol = url.searchParams.get('symbol') || 'GC'
+
+        const result = await env.DB.prepare(`
+          SELECT *
+          FROM cot_market_data
+          WHERE symbol = ?
+          ORDER BY report_date DESC, id DESC
+          LIMIT 1
+        `)
+          .bind(symbol)
+          .first()
+
+        return json({
+          success: true,
+          symbol,
+          data: result ?? null,
+        })
+      } catch (error) {
+        console.error('GET /api/cot/latest error:', error)
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to read latest COT data',
+          },
+          500,
+        )
+      }
+    }
+
+    // =========================================================
+    // GET /api/cot/history
+    // =========================================================
+    if (
+      url.pathname === '/api/cot/history' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const symbol = url.searchParams.get('symbol') || 'GC'
+
+        const limitParam = Number(
+          url.searchParams.get('limit') || '30',
+        )
+
+        const limit = Math.min(
+          Math.max(
+            Number.isFinite(limitParam) ? limitParam : 30,
+            1,
+          ),
+          100,
+        )
+
+        const result = await env.DB.prepare(`
+          SELECT *
+          FROM cot_market_data
+          WHERE symbol = ?
+          ORDER BY report_date DESC, id DESC
+          LIMIT ?
+        `)
+          .bind(symbol, limit)
+          .all()
+
+        return json({
+          success: true,
+          symbol,
+          count: result.results.length,
+          data: result.results,
+        })
+      } catch (error) {
+        console.error('GET /api/cot/history error:', error)
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to read COT history',
+          },
+          500,
+        )
+      }
+    }
+
+    // =========================================================
+    // POST /api/cot
+    // =========================================================
+    if (
+      url.pathname === '/api/cot' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const body = await request.json() as {
+          symbol?: string
+          reportDate?: string
+          openInterest?: number
+          producerLong?: number
+          producerShort?: number
+          swapDealerLong?: number
+          swapDealerShort?: number
+          managedMoneyLong?: number
+          managedMoneyShort?: number
+          otherReportablesLong?: number
+          otherReportablesShort?: number
+          source?: string
+          note?: string
+        }
+
+        if (!body.symbol || !body.reportDate) {
+          return json(
+            {
+              success: false,
+              error: 'symbol and reportDate are required',
+            },
+            400,
+          )
+        }
+
+        const result = await env.DB.prepare(`
+          INSERT INTO cot_market_data (
+            symbol,
+            report_date,
+            open_interest,
+            producer_long,
+            producer_short,
+            swap_dealer_long,
+            swap_dealer_short,
+            managed_money_long,
+            managed_money_short,
+            other_reportables_long,
+            other_reportables_short,
+            source,
+            note
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING *
+        `)
+          .bind(
+            body.symbol,
+            body.reportDate,
+            body.openInterest ?? null,
+            body.producerLong ?? null,
+            body.producerShort ?? null,
+            body.swapDealerLong ?? null,
+            body.swapDealerShort ?? null,
+            body.managedMoneyLong ?? null,
+            body.managedMoneyShort ?? null,
+            body.otherReportablesLong ?? null,
+            body.otherReportablesShort ?? null,
+            body.source ?? 'CFTC',
+            body.note ?? null,
+          )
+          .first()
+
+        return json(
+          {
+            success: true,
+            data: result,
+          },
+          201,
+        )
+      } catch (error) {
+        console.error('POST /api/cot error:', error)
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to insert COT data',
+          },
+          500,
+        )
+      }
+    }
+
+    // =========================================================
+    // GET /api/cot/intelligence
+    // =========================================================
+    if (
+      url.pathname === '/api/cot/intelligence' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const symbol = url.searchParams.get('symbol') || 'GC'
+
+        const result = await env.DB.prepare(`
+          SELECT
+            id,
+            symbol,
+            report_date,
+            open_interest,
+            producer_long,
+            producer_short,
+            swap_dealer_long,
+            swap_dealer_short,
+            managed_money_long,
+            managed_money_short,
+            other_reportables_long,
+            other_reportables_short
+          FROM cot_market_data
+          WHERE symbol = ?
+          ORDER BY report_date DESC, id DESC
+          LIMIT 2
+        `)
+          .bind(symbol)
+          .all()
+
+        const rows = result.results as Array<{
+          id: number
+          symbol: string
+          report_date: string
+          open_interest: number | null
+          producer_long: number | null
+          producer_short: number | null
+          swap_dealer_long: number | null
+          swap_dealer_short: number | null
+          managed_money_long: number | null
+          managed_money_short: number | null
+          other_reportables_long: number | null
+          other_reportables_short: number | null
+        }>
+
+        if (rows.length === 0) {
+          return json({
+            success: true,
+            symbol,
+            data: {
+              positioning: 'NEUTRAL',
+              confidence: 'LOW',
+              score: 0,
+              dataPoints: 0,
+              reasons: ['No COT data available'],
+            },
+          })
+        }
+
+        const latest = rows[0]
+        const previous = rows[1] ?? null
+
+        const value = (x: number | null): number =>
+          x == null ? 0 : Number(x)
+
+        const net = (
+          long: number | null,
+          short: number | null,
+        ): number =>
+          value(long) - value(short)
+
+        const managedMoneyNet =
+          net(
+            latest.managed_money_long,
+            latest.managed_money_short,
+          )
+
+        const producerNet =
+          net(
+            latest.producer_long,
+            latest.producer_short,
+          )
+
+        const swapDealerNet =
+          net(
+            latest.swap_dealer_long,
+            latest.swap_dealer_short,
+          )
+
+        const otherReportablesNet =
+          net(
+            latest.other_reportables_long,
+            latest.other_reportables_short,
+          )
+
+        const managedMoneyNetChange = previous
+          ? managedMoneyNet -
+            net(
+              previous.managed_money_long,
+              previous.managed_money_short,
+            )
+          : 0
+
+        const producerNetChange = previous
+          ? producerNet -
+            net(
+              previous.producer_long,
+              previous.producer_short,
+            )
+          : 0
+
+        const swapDealerNetChange = previous
+          ? swapDealerNet -
+            net(
+              previous.swap_dealer_long,
+              previous.swap_dealer_short,
+            )
+          : 0
+
+        const otherReportablesNetChange = previous
+          ? otherReportablesNet -
+            net(
+              previous.other_reportables_long,
+              previous.other_reportables_short,
+            )
+          : 0
+
+        let score = 0
+        const reasons: string[] = []
+
+        if (managedMoneyNet > 0) {
+          score += 1
+          reasons.push('Managed Money is net long')
+        } else if (managedMoneyNet < 0) {
+          score -= 1
+          reasons.push('Managed Money is net short')
+        }
+
+        if (previous) {
+          if (managedMoneyNetChange > 0) {
+            score += 1
+            reasons.push(
+              'Managed Money increased net long exposure',
+            )
+          } else if (managedMoneyNetChange < 0) {
+            score -= 1
+            reasons.push(
+              'Managed Money decreased net long exposure',
+            )
+          }
+
+          if (producerNetChange < 0) {
+            score += 1
+            reasons.push(
+              'Producer/Merchant net position decreased',
+            )
+          } else if (producerNetChange > 0) {
+            score -= 1
+            reasons.push(
+              'Producer/Merchant net position increased',
+            )
+          }
+        }
+
+        let positioning:
+          | 'STRONG_LONG'
+          | 'LONG'
+          | 'NEUTRAL'
+          | 'SHORT'
+          | 'STRONG_SHORT'
+
+        if (score >= 2) {
+          positioning = 'STRONG_LONG'
+        } else if (score === 1) {
+          positioning = 'LONG'
+        } else if (score === 0) {
+          positioning = 'NEUTRAL'
+        } else if (score === -1) {
+          positioning = 'SHORT'
+        } else {
+          positioning = 'STRONG_SHORT'
+        }
+
+        let confidence:
+          | 'HIGH'
+          | 'MEDIUM'
+          | 'LOW'
+
+        if (!previous) {
+          confidence = 'LOW'
+        } else if (Math.abs(score) >= 2) {
+          confidence = 'HIGH'
+        } else {
+          confidence = 'MEDIUM'
+        }
+
+        return json({
+          success: true,
+          symbol,
+          data: {
+            current: {
+              id: latest.id,
+              reportDate: latest.report_date,
+            },
+
+            managedMoneyNet,
+            producerNet,
+            swapDealerNet,
+            otherReportablesNet,
+
+            managedMoneyNetChange,
+            producerNetChange,
+            swapDealerNetChange,
+            otherReportablesNetChange,
+
+            positioning,
+            confidence,
+            score,
+            reasons,
+            dataPoints: rows.length,
+          },
+        })
+      } catch (error) {
+        console.error(
+          'GET /api/cot/intelligence error:',
+          error,
+        )
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to calculate COT intelligence',
+          },
+          500,
+        )
+      }
+    }
+
     // =========================================================
     // 404
     // =========================================================
