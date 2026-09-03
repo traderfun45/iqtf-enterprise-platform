@@ -1,5 +1,13 @@
+import {
+  listMarkets,
+  getMarketBySymbol,
+  createMarket,
+} from './market/markets.js'
+import { getMarketProvider } from './market/provider.js'
+
 export interface Env {
   DB: D1Database
+  TWELVEDATA_API_KEY?: string
 }
 
 function json(data: unknown, status = 200): Response {
@@ -101,6 +109,262 @@ function cmeZScore(
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+
+
+    // =========================================================
+    // MARKET API
+    // =========================================================
+
+    // GET /api/market/status
+    if (url.pathname === '/api/market/status' && request.method === 'GET') {
+      try {
+        const markets = await listMarkets(env.DB)
+
+        return json({
+          status: 'ok',
+          markets: markets.map((market) => ({
+            symbol: market.symbol,
+            name: market.name,
+            provider: market.provider,
+          })),
+          timestamp: new Date().toISOString(),
+        })
+      } catch (error) {
+        return json(
+          {
+            status: 'error',
+            error: error instanceof Error ? error.message : String(error),
+          },
+          500,
+        )
+      }
+    }
+
+    // GET /api/markets
+    if (url.pathname === '/api/markets' && request.method === 'GET') {
+      try {
+        const markets = await listMarkets(env.DB)
+        return json({
+          data: markets,
+          timestamp: new Date().toISOString(),
+        })
+      } catch (error) {
+        return json(
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          500,
+        )
+      }
+    }
+
+    // GET /api/markets/:symbol
+    if (
+      url.pathname.startsWith('/api/markets/') &&
+      request.method === 'GET'
+    ) {
+      const symbol = decodeURIComponent(
+        url.pathname.slice('/api/markets/'.length),
+      ).trim().toUpperCase()
+
+      if (!symbol) {
+        return json({ error: 'symbol is required' }, 400)
+      }
+
+      try {
+        const market = await getMarketBySymbol(env.DB, symbol)
+
+        if (!market) {
+          return json(
+            {
+              error: `Market not found: ${symbol}`,
+            },
+            404,
+          )
+        }
+
+        return json({
+          data: market,
+          timestamp: new Date().toISOString(),
+        })
+      } catch (error) {
+        return json(
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          500,
+        )
+      }
+    }
+
+    // GET /api/market/quote?symbol=XAUUSD
+    if (url.pathname === '/api/market/quote' && request.method === 'GET') {
+      const symbol = (url.searchParams.get('symbol') ?? '')
+        .trim()
+        .toUpperCase()
+
+      if (!symbol) {
+        return json({ error: 'symbol is required' }, 400)
+      }
+
+      try {
+        const market = await getMarketBySymbol(env.DB, symbol)
+
+        if (!market) {
+          return json(
+            {
+              error: `Market not found: ${symbol}`,
+            },
+            404,
+          )
+        }
+
+        const provider = getMarketProvider(
+          market.provider,
+          env,
+        )
+
+        const quote = await provider.getQuote(symbol)
+
+        return json(quote)
+      } catch (error) {
+        return json(
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          502,
+        )
+      }
+    }
+
+    // GET /api/market/snapshot
+    if (url.pathname === '/api/market/snapshot' && request.method === 'GET') {
+      try {
+        const markets = await listMarkets(env.DB)
+
+        const data = await Promise.all(
+          markets.map(async (market) => {
+            try {
+              const provider = getMarketProvider(
+                market.provider,
+                env,
+              )
+
+              const quote = await provider.getQuote(market.symbol)
+
+              return {
+                ...quote,
+                status: 'ok',
+              }
+            } catch (error) {
+              return {
+                symbol: market.symbol,
+                status: 'unavailable',
+                source: market.provider,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : String(error),
+              }
+            }
+          }),
+        )
+
+        return json({
+          data,
+          timestamp: new Date().toISOString(),
+        })
+      } catch (error) {
+        return json(
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          500,
+        )
+      }
+    }
+
+    // GET /api/market/history
+    if (url.pathname === '/api/market/history' && request.method === 'GET') {
+      const symbol = (url.searchParams.get('symbol') ?? '')
+        .trim()
+        .toUpperCase()
+
+      if (!symbol) {
+        return json({ error: 'symbol is required' }, 400)
+      }
+
+      const interval = url.searchParams.get('interval') ?? '1h'
+      const outputsizeRaw = url.searchParams.get('outputsize')
+      const outputsize = outputsizeRaw
+        ? Number(outputsizeRaw)
+        : 100
+
+      if (
+        !Number.isInteger(outputsize) ||
+        outputsize < 1
+      ) {
+        return json(
+          { error: 'outputsize must be a positive integer' },
+          400,
+        )
+      }
+
+      try {
+        const market = await getMarketBySymbol(env.DB, symbol)
+
+        if (!market) {
+          return json(
+            {
+              error: `Market not found: ${symbol}`,
+            },
+            404,
+          )
+        }
+
+        const provider = getMarketProvider(
+          market.provider,
+          env,
+        )
+
+        if (!provider.getHistory) {
+          return json(
+            {
+              error: `Historical data is not supported for ${symbol}`,
+            },
+            501,
+          )
+        }
+
+        const candles = await provider.getHistory(
+          symbol,
+          {
+            interval,
+            outputsize,
+            startDate:
+              url.searchParams.get('startDate') ?? undefined,
+            endDate:
+              url.searchParams.get('endDate') ?? undefined,
+          },
+        )
+
+        return json({
+          symbol,
+          provider: market.provider,
+          interval,
+          count: candles.length,
+          data: candles,
+          timestamp: new Date().toISOString(),
+        })
+      } catch (error) {
+        return json(
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          502,
+        )
+      }
+    }
 
     // =========================================================
     // GET /health
