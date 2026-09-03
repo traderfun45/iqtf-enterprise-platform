@@ -4,6 +4,7 @@ import {
   createMarket,
 } from './market/markets.js'
 import { getMarketProvider } from './market/provider.js'
+import { calculateMarketIntelligence } from './intelligence/market.js'
 
 export interface Env {
   DB: D1Database
@@ -280,6 +281,57 @@ export default {
             error: error instanceof Error ? error.message : String(error),
           },
           500,
+        )
+      }
+    }
+
+    // GET /api/market/intelligence?symbol=XAUUSD&interval=1h&outputsize=50
+    if (url.pathname === '/api/market/intelligence' && request.method === 'GET') {
+      const symbol = (url.searchParams.get('symbol') || 'XAUUSD').toUpperCase()
+      const interval = url.searchParams.get('interval') || '1h'
+      const outputsizeRaw = url.searchParams.get('outputsize') || '50'
+      const outputsize = Number.parseInt(outputsizeRaw, 10)
+
+      if (!Number.isInteger(outputsize) || outputsize < 2) {
+        return json({ error: 'outputsize must be an integer >= 2' }, 400)
+      }
+
+      try {
+        const market = await getMarketBySymbol(env.DB, symbol)
+
+        if (!market) {
+          return json({ error: `Unknown market: ${symbol}` }, 404)
+        }
+
+        const provider = getMarketProvider(market.provider, env)
+
+        if (!provider.getHistory) {
+          return json({ error: `History is not supported for ${symbol}` }, 501)
+        }
+
+        const candles = await provider.getHistory(symbol, {
+          interval,
+          outputsize,
+        })
+
+        if (!candles.length) {
+          return json({ error: `No market history available for ${symbol}` }, 404)
+        }
+
+        const intelligence = calculateMarketIntelligence(candles)
+
+        return json({
+          ...intelligence,
+          interval,
+          candleCount: candles.length,
+        })
+      } catch (error) {
+        return json(
+          {
+            error: 'Market intelligence failed',
+            message: error instanceof Error ? error.message : String(error),
+          },
+          502,
         )
       }
     }
