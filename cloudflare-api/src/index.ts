@@ -5,6 +5,10 @@ import {
 } from './market/markets.js'
 import { getMarketProvider } from './market/provider.js'
 import { calculateMarketIntelligence } from './intelligence/market.js'
+import { analyzeVol2Vol } from './intelligence/vol2vol.js'
+import { resolveVol2VolState } from './intelligence/vol2volState.js'
+import { calculateIqtfDecision } from './intelligence/iqtfDecision.js'
+import { analyzeCotIntelligence } from './intelligence/cot.js'
 
 export interface Env {
   DB: D1Database
@@ -790,6 +794,537 @@ export default {
       }
     }
 
+
+    // =========================================================
+    // GET /api/cme/analysis
+    // =========================================================
+    if (
+      url.pathname === '/api/cme/analysis' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const symbol = (
+          url.searchParams.get('symbol') || 'GC'
+        ).trim().toUpperCase()
+
+        const result = await env.DB.prepare(`
+          SELECT
+            id,
+            symbol,
+            data_date,
+            data_time,
+            settlement_price,
+            volume,
+            open_interest,
+            volume_zscore,
+            oi_zscore
+          FROM cme_market_data
+          WHERE symbol = ?
+          ORDER BY data_date DESC, data_time DESC, id DESC
+          LIMIT 100
+        `)
+          .bind(symbol)
+          .all()
+
+        const rows = result.results as Array<{
+          id: number
+          symbol: string
+          data_date: string
+          data_time: string | null
+          settlement_price: number | null
+          volume: number | null
+          open_interest: number | null
+          volume_zscore: number | null
+          oi_zscore: number | null
+        }>
+
+        const latest = rows[0]
+        const previous = rows[1]
+
+        if (!latest || latest.settlement_price == null) {
+          return json(
+            {
+              success: false,
+              error: 'No CME market data available',
+              symbol,
+            },
+            404,
+          )
+        }
+
+        const historicalVolumeChanges: number[] = []
+        const historicalOIChanges: number[] = []
+
+        for (let i = 1; i < rows.length; i++) {
+          const current = rows[i - 1]
+          const previousRow = rows[i]
+
+          if (
+            current.volume != null &&
+            previousRow.volume != null
+          ) {
+            historicalVolumeChanges.push(
+              current.volume - previousRow.volume,
+            )
+          }
+
+          if (
+            current.open_interest != null &&
+            previousRow.open_interest != null
+          ) {
+            historicalOIChanges.push(
+              current.open_interest -
+                previousRow.open_interest,
+            )
+          }
+        }
+
+        const price = latest.settlement_price
+        const previousPrice =
+          previous?.settlement_price ?? price
+
+        const volume = latest.volume ?? 0
+        const previousVolume =
+          previous?.volume ?? volume
+
+        const openInterest =
+          latest.open_interest ?? 0
+        const previousOpenInterest =
+          previous?.open_interest ?? openInterest
+
+        const priceChange = price - previousPrice
+        const volumeChange = volume - previousVolume
+        const openInterestChange =
+          openInterest - previousOpenInterest
+
+        const priceChangePercent =
+          !Number.isFinite(previousPrice) ||
+          previousPrice === 0
+            ? 0
+            : ((price - previousPrice) / previousPrice) * 100
+
+        const volumeChangePercent =
+          !Number.isFinite(previousVolume) ||
+          previousVolume === 0
+            ? 0
+            : ((volume - previousVolume) / previousVolume) * 100
+
+        const openInterestChangePercent =
+          !Number.isFinite(previousOpenInterest) ||
+          previousOpenInterest === 0
+            ? 0
+            : ((openInterest - previousOpenInterest) /
+                previousOpenInterest) *
+              100
+
+        const volumeZscore =
+          latest.volume_zscore ??
+          cmeZScore(
+            volumeChange,
+            historicalVolumeChanges,
+          ) ??
+          0
+
+        const oiZscore =
+          latest.oi_zscore ??
+          cmeZScore(
+            openInterestChange,
+            historicalOIChanges,
+          ) ??
+          0
+
+        let positioning: CmePositioning = 'NEUTRAL'
+
+        if (priceChange > 0 && openInterestChange > 0) {
+          positioning = 'LONG_BUILDUP'
+        } else if (
+          priceChange < 0 &&
+          openInterestChange > 0
+        ) {
+          positioning = 'SHORT_BUILDUP'
+        } else if (
+          priceChange > 0 &&
+          openInterestChange < 0
+        ) {
+          positioning = 'SHORT_COVERING'
+        } else if (
+          priceChange < 0 &&
+          openInterestChange < 0
+        ) {
+          positioning = 'LONG_LIQUIDATION'
+        }
+
+        const priceSignal =
+          priceChange > 0
+            ? 1
+            : priceChange < 0
+              ? -1
+              : 0
+
+        const oiSignal =
+          openInterestChange > 0
+            ? 1
+            : openInterestChange < 0
+              ? -1
+              : 0
+
+        const volumeSignal =
+          volumeChange > 0
+            ? 1
+            : volumeChange < 0
+              ? -1
+              : 0
+
+        const confirmationScore = Math.max(
+          -1,
+          Math.min(
+            1,
+            priceSignal * 0.4 +
+              oiSignal * 0.35 +
+              volumeSignal * 0.25,
+          ),
+        )
+
+        const volumeConfirmation =
+          cmeStrength(
+            latest.volume_zscore ??
+              cmeZScore(
+                volumeChange,
+                historicalVolumeChanges,
+              ),
+          )
+
+        const oiConfirmation =
+          cmeStrength(
+            latest.oi_zscore ??
+              cmeZScore(
+                openInterestChange,
+                historicalOIChanges,
+              ),
+          )
+
+        const intelligence = {
+          priceChange,
+          priceChangePercent,
+          volumeChange,
+          volumeChangePercent,
+          openInterestChange,
+          openInterestChangePercent,
+          volumeZscore,
+          oiZscore,
+          positioning,
+          volumeConfirmation,
+          oiConfirmation,
+          confirmationScore,
+        }
+
+        const vol2vol = analyzeVol2Vol({
+          priceChange,
+          volumeChange,
+          openInterestChange,
+          volumeZscore,
+          oiZscore,
+          positioning,
+        })
+
+        // =========================================================
+        // COT INTELLIGENCE
+        // =========================================================
+        const cotResult = await env.DB.prepare(`
+          SELECT
+            id,
+            symbol,
+            report_date,
+            open_interest,
+            producer_long,
+            producer_short,
+            swap_dealer_long,
+            swap_dealer_short,
+            managed_money_long,
+            managed_money_short,
+            other_reportables_long,
+            other_reportables_short
+          FROM cot_market_data
+          WHERE symbol = ?
+          ORDER BY report_date DESC, id DESC
+          LIMIT 2
+        `)
+          .bind(symbol)
+          .all()
+
+        const cotRows = cotResult.results as Array<{
+          id: number
+          symbol: string
+          report_date: string
+          open_interest: number | null
+          producer_long: number | null
+          producer_short: number | null
+          swap_dealer_long: number | null
+          swap_dealer_short: number | null
+          managed_money_long: number | null
+          managed_money_short: number | null
+          other_reportables_long: number | null
+          other_reportables_short: number | null
+        }>
+
+        const cotLatest = cotRows[0]
+        const cotPrevious = cotRows[1] ?? null
+
+        const cotIntelligence = cotLatest
+          ? analyzeCotIntelligence({
+              latest: {
+                symbol: cotLatest.symbol,
+                reportDate: cotLatest.report_date,
+                openInterest: cotLatest.open_interest ?? undefined,
+                producerLong: cotLatest.producer_long ?? undefined,
+                producerShort: cotLatest.producer_short ?? undefined,
+                swapDealerLong: cotLatest.swap_dealer_long ?? undefined,
+                swapDealerShort: cotLatest.swap_dealer_short ?? undefined,
+                managedMoneyLong: cotLatest.managed_money_long ?? undefined,
+                managedMoneyShort: cotLatest.managed_money_short ?? undefined,
+                otherReportablesLong:
+                  cotLatest.other_reportables_long ?? undefined,
+                otherReportablesShort:
+                  cotLatest.other_reportables_short ?? undefined,
+              },
+              previous: cotPrevious
+                ? {
+                    symbol: cotPrevious.symbol,
+                    reportDate: cotPrevious.report_date,
+                    openInterest:
+                      cotPrevious.open_interest ?? undefined,
+                    producerLong:
+                      cotPrevious.producer_long ?? undefined,
+                    producerShort:
+                      cotPrevious.producer_short ?? undefined,
+                    swapDealerLong:
+                      cotPrevious.swap_dealer_long ?? undefined,
+                    swapDealerShort:
+                      cotPrevious.swap_dealer_short ?? undefined,
+                    managedMoneyLong:
+                      cotPrevious.managed_money_long ?? undefined,
+                    managedMoneyShort:
+                      cotPrevious.managed_money_short ?? undefined,
+                    otherReportablesLong:
+                      cotPrevious.other_reportables_long ?? undefined,
+                    otherReportablesShort:
+                      cotPrevious.other_reportables_short ?? undefined,
+                  }
+                : null,
+            })
+          : {
+              managedMoneyNet: 0,
+              producerNet: 0,
+              swapDealerNet: 0,
+              otherReportablesNet: 0,
+              managedMoneyNetChange: 0,
+              producerNetChange: 0,
+              swapDealerNetChange: 0,
+              otherReportablesNetChange: 0,
+              positioning: 'NEUTRAL' as const,
+              confidence: 'LOW' as const,
+              score: 0,
+              reasons: ['No COT data available'],
+            }
+
+        const stateResult = await env.DB.prepare(`
+          SELECT
+            symbol,
+            state,
+            signal,
+            confidence,
+            action,
+            updated_at
+          FROM vol2vol_state
+          WHERE symbol = ?
+          LIMIT 1
+        `)
+          .bind(symbol)
+          .all()
+
+        const stateRow = stateResult.results[0] as {
+          symbol: string
+          state:
+            | 'NO_POSITION'
+            | 'LONG_ACTIVE'
+            | 'SHORT_ACTIVE'
+          signal:
+            | 'LONG_ENTRY'
+            | 'SHORT_ENTRY'
+            | 'LONG_HOLD'
+            | 'SHORT_HOLD'
+            | 'LONG_EXIT'
+            | 'SHORT_EXIT'
+            | 'NO_TRADE'
+          confidence: 'HIGH' | 'MEDIUM' | 'LOW'
+          action:
+            | 'ENTER_LONG'
+            | 'ENTER_SHORT'
+            | 'HOLD_LONG'
+            | 'HOLD_SHORT'
+            | 'EXIT_LONG'
+            | 'EXIT_SHORT'
+            | 'WAIT'
+          updated_at: string | null
+        } | undefined
+
+        const storedState = stateRow ?? {
+          symbol,
+          state: 'NO_POSITION' as const,
+          signal: 'NO_TRADE' as const,
+          confidence: 'LOW' as const,
+          action: 'WAIT' as const,
+          updated_at: null,
+        }
+
+        const vol2volState = resolveVol2VolState({
+          previousState: storedState.state,
+          signal: vol2vol.signal,
+          confidence: vol2vol.confidence,
+        })
+
+        await env.DB.prepare(`
+          INSERT INTO vol2vol_state (
+            symbol,
+            state,
+            signal,
+            confidence,
+            action,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(symbol)
+          DO UPDATE SET
+            state = excluded.state,
+            signal = excluded.signal,
+            confidence = excluded.confidence,
+            action = excluded.action,
+            updated_at = CURRENT_TIMESTAMP
+        `)
+          .bind(
+            symbol,
+            vol2volState.state,
+            vol2volState.signal,
+            vol2volState.confidence,
+            vol2volState.action,
+          )
+          .run()
+
+        const market = await getMarketBySymbol(
+          env.DB,
+          symbol,
+        )
+
+        let marketIntelligence: {
+          intelligence: ReturnType<
+            typeof calculateMarketIntelligence
+          >
+          candleCount: number
+        } | null = null
+
+        if (market) {
+          const provider = getMarketProvider(
+            market.provider,
+            env,
+          )
+
+          if (provider.getHistory) {
+            const candles = await provider.getHistory(
+              symbol,
+              {
+                interval: '1h',
+                outputsize: 50,
+              },
+            )
+
+            if (candles.length >= 2) {
+              marketIntelligence = {
+                intelligence:
+                  calculateMarketIntelligence(candles),
+                candleCount: candles.length,
+              }
+            }
+          }
+        }
+
+        const marketScore =
+          marketIntelligence?.intelligence.score ?? 0
+
+        const marketSignal =
+          marketIntelligence?.intelligence.signal ??
+          'neutral'
+
+        const marketRisk =
+          marketIntelligence?.intelligence.riskState ??
+          'NORMAL'
+
+        const iqtfDecision = calculateIqtfDecision({
+          marketScore,
+          cmeConfirmation: confirmationScore,
+          vol2volScore: vol2vol.score,
+          cotScore: cotIntelligence.score / 2,
+          marketSignal,
+          marketStructure:
+            marketIntelligence?.intelligence.structure.direction ??
+            'neutral',
+          volatilityRegime: marketRisk,
+          cmePositioning: positioning,
+          cmeOiConfirmation: oiConfirmation,
+          vol2volSignal: vol2vol.signal,
+          cotPositioning: cotIntelligence.positioning,
+        })
+
+        return json({
+          success: true,
+          symbol,
+          data: latest,
+          intelligence,
+          vol2vol,
+          cotIntelligence,
+          vol2volState,
+          previousState: storedState.state,
+          savedState: {
+            symbol,
+            state: vol2volState.state,
+            signal: vol2volState.signal,
+            confidence: vol2volState.confidence,
+            action: vol2volState.action,
+          },
+          marketIntelligence: marketIntelligence
+            ? marketIntelligence.intelligence
+            : {
+                signal: marketSignal,
+                score: marketScore,
+                riskState: marketRisk,
+              },
+          iqtfDecision,
+          historyStats: {
+            records: rows.length,
+            volumeChangeSamples:
+              historicalVolumeChanges.length,
+            oiChangeSamples:
+              historicalOIChanges.length,
+          },
+        })
+      } catch (error) {
+        console.error(
+          'GET /api/cme/analysis error:',
+          error,
+        )
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to calculate CME analysis',
+            message:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          },
+          500,
+        )
+      }
+    }
 
     // =========================================================
     // GET /api/cme/intelligence
