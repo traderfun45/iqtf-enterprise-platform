@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
-import { API } from '@/lib/api'
+import { API, readJson } from '@/lib/api'
 
 type CmeData = {
   id?: number
@@ -18,6 +18,32 @@ type CmeData = {
   note?: string
 inputMethod?: 'MANUAL' | 'OCR' | 'CME_API'
   imageReference?: string
+}
+
+type CmeOcrResult = {
+  screenshotType?: string
+  underlyingFutures?: Array<{
+    symbol?: string
+    settlement?: number
+    price?: number
+  }>
+  volatilitySettlement?: number
+
+callVolume?: number
+putVolume?: number
+
+expectedRange?: {
+  minus3?: number
+  minus2?: number
+  minus1?: number
+  atm?: number
+  plus1?: number
+  plus2?: number
+  plus3?: number
+}
+
+  optionRows?: unknown[]
+  notableConcentrations?: unknown[]
 }
 
 type CmeAnalysis = {
@@ -70,6 +96,8 @@ export default function CmeAdminPage() {
   const [analysis, setAnalysis] = useState<CmeAnalysis | null>(null)
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+const [ocrLoading, setOcrLoading] = useState(false)
+const [ocrResult, setOcrResult] = useState<CmeOcrResult | null>(null)
 
   function handleImageSelect(file: File | null) {
   if (!file) return
@@ -93,6 +121,65 @@ export default function CmeAdminPage() {
   setMessage(`Image selected: ${file.name}`)
 }
 
+async function handleOcrScan() {
+  if (!selectedImage) {
+    setMessage('Please select a CME screenshot first')
+    return
+  }
+
+  setOcrLoading(true)
+  setMessage('')
+  setOcrResult(null)
+
+  try {
+    const buffer = await selectedImage.arrayBuffer()
+
+    const bytes = new Uint8Array(buffer)
+
+    let binary = ''
+
+    const chunkSize = 0x8000
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(
+        ...bytes.subarray(i, i + chunkSize),
+      )
+    }
+
+    const base64 = btoa(binary)
+
+    const response = await fetch(`${API}/api/cme/ocr`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image: base64,
+      }),
+    })
+
+    const result = await readJson<{ error?: string; data?: CmeOcrResult }>(response)
+
+    if (!response.ok) {
+      throw new Error(
+        result.error ?? 'CME OCR failed',
+      )
+    }
+
+    setOcrResult(result.data ?? null)
+
+    setMessage('CME screenshot OCR completed successfully')
+  } catch (error) {
+    setMessage(
+      error instanceof Error
+        ? error.message
+        : 'CME OCR failed',
+    )
+  } finally {
+    setOcrLoading(false)
+  }
+}
+
   async function loadAnalysis() {
     try {
       const response = await fetch(
@@ -100,7 +187,7 @@ export default function CmeAdminPage() {
         { cache: 'no-store' },
       )
 
-      const result = await response.json()
+      const result = await readJson<CmeAnalysis>(response)
 
       if (!response.ok) {
         setAnalysis(null)
@@ -120,7 +207,7 @@ export default function CmeAdminPage() {
         { cache: 'no-store' },
       )
 
-      const result = await response.json()
+      const result = await readJson<{ data?: CmeData[] }>(response)
       setHistory(result.data ?? [])
     } catch {
       setMessage('Unable to load CME history')
@@ -156,7 +243,7 @@ export default function CmeAdminPage() {
         body: JSON.stringify(form),
       })
 
-      const result = await response.json()
+      const result = await readJson<{ error?: string }>(response)
 
       if (!response.ok) {
         throw new Error(result.error ?? 'Failed to save CME data')
@@ -393,11 +480,128 @@ export default function CmeAdminPage() {
       )}
 
       <div className="text-xs opacity-60">
-        Input Method: {form.inputMethod ?? 'MANUAL'}
+
+ <button
+  type="button"
+  onClick={handleOcrScan}
+  disabled={ocrLoading}
+  className="rounded-md border px-4 py-2 font-medium"
+>
+  {ocrLoading
+    ? 'Scanning CME Screenshot...'
+    : 'Scan CME Screenshot'}
+</button>
+
+      Input Method: {form.inputMethod ?? 'MANUAL'}
       </div>
     </div>
   )}
 </div>
+
+{ocrResult && (
+  <div className="md:col-span-2 rounded-xl border p-5">
+    <h3 className="text-lg font-semibold">
+      CME Vol2Vol OCR Result
+    </h3>
+
+    <div className="mt-4 grid gap-3 md:grid-cols-4">
+      <div className="rounded-lg border p-3">
+        <div className="text-xs opacity-60">
+          GC Settlement
+        </div>
+        <div className="text-xl font-semibold">
+          {ocrResult.underlyingFutures?.[0]?.settlement ?? '-'}
+        </div>
+      </div>
+
+      <div className="rounded-lg border p-3">
+        <div className="text-xs opacity-60">
+          Vol Settlement
+        </div>
+        <div className="text-xl font-semibold">
+          {ocrResult.volatilitySettlement ?? '-'}
+        </div>
+      </div>
+
+<div className="rounded-lg border p-3">
+  <div className="text-xs opacity-60">
+    Calls
+  </div>
+
+  <div className="text-xl font-semibold">
+    {ocrResult.callVolume?.toLocaleString() ?? '-'}
+  </div>
+</div>
+
+<div className="rounded-lg border p-3">
+  <div className="text-xs opacity-60">
+    Puts
+  </div>
+
+  <div className="text-xl font-semibold">
+    {ocrResult.putVolume?.toLocaleString() ?? '-'}
+  </div>
+</div>
+      </div>
+
+    <div className="mt-5">
+      <h4 className="mb-3 font-semibold">
+        Expected Range
+      </h4>
+
+<div className="rounded-lg border p-3">
+  <div className="text-xs opacity-60">-3σ</div>
+  <div className="text-lg font-semibold">
+    {ocrResult.expectedRange?.minus3 ?? '-'}
+  </div>
+</div>
+
+<div className="rounded-lg border p-3">
+  <div className="text-xs opacity-60">-2σ</div>
+  <div className="text-lg font-semibold">
+    {ocrResult.expectedRange?.minus2 ?? '-'}
+  </div>
+</div>
+
+<div className="rounded-lg border p-3">
+  <div className="text-xs opacity-60">-1σ</div>
+  <div className="text-lg font-semibold">
+    {ocrResult.expectedRange?.minus1 ?? '-'}
+  </div>
+</div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <div className="rounded-lg border p-3">
+          <div className="text-xs opacity-60">ATM</div>
+          <div className="text-lg font-semibold">
+            {ocrResult.expectedRange?.atm ?? '-'}
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-3">
+          <div className="text-xs opacity-60">+1σ</div>
+          <div className="text-lg font-semibold">
+            {ocrResult.expectedRange?.plus1 ?? '-'}
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-3">
+          <div className="text-xs opacity-60">+2σ</div>
+          <div className="text-lg font-semibold">
+            {ocrResult.expectedRange?.plus2 ?? '-'}
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-3">
+          <div className="text-xs opacity-60">+3σ</div>
+          <div className="text-lg font-semibold">
+            {ocrResult.expectedRange?.plus3 ?? '-'}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
             <div className="md:col-span-2">
               <button

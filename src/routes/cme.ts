@@ -1,9 +1,10 @@
 import { runCmeOcr } from '../services/cmeOcr.js'
+import { analyzeCmeImageWithNvidia } from '../services/nvidiaVision.js'
 
-import { analyzeCmeImage } from '../services/openaiVision.js'
 import { normalizeCmeVision } from '../services/cmeVisionNormalizer.js'
 import { validateCmeVision } from '../services/cmeVisionValidator.js'
 import { analyzeCmeOptionIntelligence } from '../services/cmeOptionIntelligence.js'
+import { parseCmeVol2Vol } from '../services/cmeVol2VolParser.js'
 import fs from "node:fs/promises"
 import type { FastifyInstance } from 'fastify'
 
@@ -89,23 +90,66 @@ export async function cmeRoutes(
     try {
       const imageBuffer = Buffer.from(body.image, 'base64')
 
-        const tempPath = `./cme-ocr-${Date.now()}.jpg`
+        const tempPath = `./cme-ocr-${Date.now()}.png`
 
 await fs.writeFile(tempPath, imageBuffer)
 
 try {
-  const visionResult = await analyzeCmeImage(tempPath)
+  const visionResult = await analyzeCmeImageWithNvidia(tempPath)
 console.log(
   'CME RAW VISION:',
   JSON.stringify(visionResult, null, 2)
 )
-  const normalizedResult = normalizeCmeVision(visionResult)
-  const validation = validateCmeVision(normalizedResult)
+  const parsedVol2Vol = parseCmeVol2Vol(
+  visionResult.raw_text ?? '',
+)
 
-    const optionIntelligence =
-      analyzeCmeOptionIntelligence(
-        normalizedResult.optionRows,
-      )
+console.log(
+  'CME PARSED VOL2VOL:',
+  JSON.stringify(parsedVol2Vol, null, 2),
+)
+
+const normalizedResult = normalizeCmeVision({
+  ...visionResult,
+  underlying_futures: [
+    {
+      symbol: 'GC',
+      settlement: parsedVol2Vol.futureSettlement,
+      price: parsedVol2Vol.futureSettlement,
+    },
+  ],
+
+volatility_settlement:
+  parsedVol2Vol.volatilitySettlement,
+
+expectedRange:
+  parsedVol2Vol.expectedRange,
+
+call_volume:
+  parsedVol2Vol.callVolume,
+
+put_volume:
+  parsedVol2Vol.putVolume,
+
+})
+
+console.log('CME STEP: before validation')
+
+const validation = validateCmeVision(normalizedResult)
+
+console.log('CME STEP: after validation')
+
+console.log('CME STEP: before option intelligence')
+
+const optionIntelligence =
+  analyzeCmeOptionIntelligence(
+    normalizedResult.optionRows,
+  )
+
+console.log('CME STEP: after option intelligence')
+
+console.log('CME STEP: before return')
+
 
   return {
     success: true,

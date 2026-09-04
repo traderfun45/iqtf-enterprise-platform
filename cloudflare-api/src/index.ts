@@ -9,10 +9,15 @@ import { analyzeVol2Vol } from './intelligence/vol2vol.js'
 import { resolveVol2VolState } from './intelligence/vol2volState.js'
 import { calculateIqtfDecision } from './intelligence/iqtfDecision.js'
 import { analyzeCotIntelligence } from './intelligence/cot.js'
+import { analyzeCmeImageWithNvidia } from './services/nvidiaVision.js'
+import { parseCmeVol2Vol } from './services/cmeVol2VolParser.js'
+import { normalizeCmeVision } from './services/cmeVisionNormalizer.js'
+
 
 export interface Env {
   DB: D1Database
   TWELVEDATA_API_KEY?: string
+  NVIDIA_API_KEY?: string
 }
 
 function json(data: unknown, status = 200): Response {
@@ -528,6 +533,128 @@ export default {
         count: result.results.length,
         data: result.results,
       })
+    }
+
+    // POST /api/cme/ocr
+    if (
+      url.pathname === '/api/cme/ocr' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const body = (await request.json()) as {
+          image?: string
+        }
+
+        if (!body.image) {
+          return json(
+            {
+              success: false,
+              error: 'image is required',
+            },
+            400,
+          )
+        }
+
+        if (!env.NVIDIA_API_KEY) {
+          return json(
+            {
+              success: false,
+              error: 'NVIDIA_API_KEY is not configured',
+            },
+            500,
+          )
+        }
+
+        console.log('CME OCR: NVIDIA Vision started')
+
+        const visionResult =
+          await analyzeCmeImageWithNvidia(
+            body.image,
+            env.NVIDIA_API_KEY,
+          )
+
+        console.log(
+          'CME RAW VISION:',
+          JSON.stringify(
+            visionResult,
+            null,
+            2,
+          ),
+        )
+
+        const parsedVol2Vol =
+          parseCmeVol2Vol(
+            visionResult.raw_text ?? '',
+          )
+
+        console.log(
+          'CME PARSED VOL2VOL:',
+          JSON.stringify(
+            parsedVol2Vol,
+            null,
+            2,
+          ),
+        )
+
+        const normalizedResult =
+          normalizeCmeVision({
+            ...visionResult,
+
+            underlying_futures: [
+              {
+                symbol: 'GC',
+                settlement:
+                  parsedVol2Vol.futureSettlement,
+                price:
+                  parsedVol2Vol.futureSettlement,
+              },
+            ],
+
+            volatility_settlement:
+              parsedVol2Vol.volatilitySettlement,
+
+            expectedRange:
+              parsedVol2Vol.expectedRange,
+
+            call_volume:
+              parsedVol2Vol.callVolume,
+
+            put_volume:
+              parsedVol2Vol.putVolume,
+          })
+
+        console.log(
+          'CME NORMALIZED:',
+          JSON.stringify(
+            normalizedResult,
+            null,
+            2,
+          ),
+        )
+
+        return json({
+          success: true,
+          data: normalizedResult,
+          rawVision: visionResult,
+          parsedVol2Vol,
+        })
+      } catch (error) {
+        console.error(
+          'POST /api/cme/ocr error:',
+          error,
+        )
+
+        return json(
+          {
+            success: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : 'CME OCR failed',
+          },
+          500,
+        )
+      }
     }
 
     // =========================================================
