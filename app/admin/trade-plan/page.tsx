@@ -1,3 +1,4 @@
+
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
@@ -19,6 +20,31 @@ type TradePlan = {
   createdAt?: string
 }
 
+type IqtfAnalysis = {
+  iqtfDecision: {
+    decision: 'LONG' | 'LONG_WATCH' | 'NO_TRADE' | 'SHORT_WATCH' | 'SHORT'
+    confidence: number
+    riskState: 'LOW' | 'NORMAL' | 'ELEVATED' | 'HIGH'
+    signalConflict: boolean
+    tradePermission: 'ALLOWED' | 'BLOCKED'
+    tradePermissionReason: string
+  }
+  tradeSetup: {
+    available: boolean
+    decision: 'LONG' | 'LONG_WATCH' | 'NO_TRADE' | 'SHORT_WATCH' | 'SHORT'
+    entry: number | null
+    stopLoss: number | null
+    takeProfit1: number | null
+    takeProfit2: number | null
+    takeProfit3: number | null
+    riskAmount: number | null
+    riskRewardTp1: number | null
+    riskRewardTp2: number | null
+    riskRewardTp3: number | null
+    reason?: string
+  }
+}
+
 const emptyForm = {
   symbol: 'GC',
   direction: 'LONG' as Direction,
@@ -38,6 +64,33 @@ export default function TradePlanAdminPage() {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+const [iqtfAnalysis, setIqtfAnalysis] =
+  useState<IqtfAnalysis | null>(null)
+
+const [iqtfLoading, setIqtfLoading] =
+  useState(false)
+
+async function loadIqtfAnalysis() {
+  setIqtfLoading(true)
+
+  try {
+    const response = await fetch(
+      `${API}/api/institutional/analysis?symbol=${form.symbol}`,
+      { cache: 'no-store' },
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to load IQTF analysis')
+    }
+
+    const result = (await response.json()) as IqtfAnalysis
+    setIqtfAnalysis(result)
+  } catch {
+    setIqtfAnalysis(null)
+  } finally {
+    setIqtfLoading(false)
+  }
+}
 
   async function loadData() {
     try {
@@ -53,14 +106,18 @@ export default function TradePlanAdminPage() {
       ])
 
       if (latestResponse.ok) {
-        const latestResult = await latestResponse.json()
+        const latestResult = (await latestResponse.json()) as {
+          data?: TradePlan
+        }
         setLatest(latestResult.data ?? null)
       } else {
         setLatest(null)
       }
 
       if (historyResponse.ok) {
-        const historyResult = await historyResponse.json()
+        const historyResult = (await historyResponse.json()) as {
+          data?: TradePlan[]
+        }
         setHistory(historyResult.data ?? [])
       }
     } catch {
@@ -68,9 +125,10 @@ export default function TradePlanAdminPage() {
     }
   }
 
-  useEffect(() => {
-    loadData()
-  }, [form.symbol])
+useEffect(() => {
+  loadData()
+  loadIqtfAnalysis()
+}, [form.symbol])
 
   function updateField(field: keyof typeof emptyForm, value: string) {
     setForm((current) => ({
@@ -147,7 +205,9 @@ export default function TradePlanAdminPage() {
         body: JSON.stringify({ status }),
       })
 
-      const result = await response.json()
+      const result = (await response.json()) as {
+          error?: string
+        }
 
       if (!response.ok) {
         throw new Error(result.error ?? 'Failed to update status')
@@ -205,7 +265,9 @@ export default function TradePlanAdminPage() {
         },
       )
 
-      const result = await response.json()
+      const result = (await response.json()) as {
+          error?: string
+        }
 
       if (!response.ok) {
         throw new Error(result.error ?? 'Failed to save Trade Plan')
@@ -246,7 +308,9 @@ export default function TradePlanAdminPage() {
         { method: 'DELETE' },
       )
 
-      const result = await response.json()
+      const result = (await response.json()) as {
+          error?: string
+        }
 
       if (!response.ok) {
         throw new Error(result.error ?? 'Failed to delete')
@@ -275,6 +339,145 @@ export default function TradePlanAdminPage() {
             Entry / Stop Loss / TP1 / TP2 / TP3
           </p>
         </header>
+
+<section className="rounded-xl border p-6">
+  <div className="flex items-center justify-between">
+    <div>
+      <h2 className="text-xl font-semibold">
+        IQTF SIGNAL
+      </h2>
+      <p className="text-sm opacity-70">
+        Institutional + Market Decision Engine
+      </p>
+    </div>
+
+    {iqtfLoading && (
+      <span className="text-sm opacity-60">
+        Loading...
+      </span>
+    )}
+  </div>
+
+  {iqtfAnalysis && (
+    <div className="mt-5 space-y-4">
+
+      <div className="grid gap-3 md:grid-cols-4">
+
+        <div className="rounded-lg border p-4">
+          <div className="text-xs opacity-60">
+            Decision
+          </div>
+          <div className="mt-1 text-2xl font-bold">
+            {iqtfAnalysis.iqtfDecision.decision}
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-4">
+          <div className="text-xs opacity-60">
+            Confidence
+          </div>
+          <div className="mt-1 text-2xl font-bold">
+            {iqtfAnalysis.iqtfDecision.confidence}%
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-4">
+          <div className="text-xs opacity-60">
+            Risk State
+          </div>
+          <div className="mt-1 text-2xl font-bold">
+            {iqtfAnalysis.iqtfDecision.riskState}
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-4">
+          <div className="text-xs opacity-60">
+            Permission
+          </div>
+          <div className="mt-1 text-2xl font-bold">
+            {iqtfAnalysis.iqtfDecision.tradePermission}
+          </div>
+        </div>
+
+      </div>
+
+      <div className="rounded-lg border p-4">
+        <div className="text-sm font-semibold">
+          Permission Reason
+        </div>
+
+        <div className="mt-1 text-sm opacity-70">
+          {iqtfAnalysis.iqtfDecision.tradePermissionReason}
+        </div>
+      </div>
+
+      {iqtfAnalysis.tradeSetup.available && (
+        <div className="rounded-lg border p-4">
+          <div className="mb-3 text-sm font-semibold">
+            Trade Setup
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-5">
+
+            <div>
+              <div className="text-xs opacity-60">
+                Entry
+              </div>
+              <div className="font-bold">
+                {iqtfAnalysis.tradeSetup.entry}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs opacity-60">
+                Stop Loss
+              </div>
+              <div className="font-bold">
+                {iqtfAnalysis.tradeSetup.stopLoss}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs opacity-60">
+                TP1
+              </div>
+              <div className="font-bold">
+                {iqtfAnalysis.tradeSetup.takeProfit1}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs opacity-60">
+                TP2
+              </div>
+              <div className="font-bold">
+                {iqtfAnalysis.tradeSetup.takeProfit2}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs opacity-60">
+                TP3
+              </div>
+              <div className="font-bold">
+                {iqtfAnalysis.tradeSetup.takeProfit3}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {!iqtfAnalysis.tradeSetup.available && (
+        <div className="rounded-lg border p-4 text-sm">
+          {iqtfAnalysis.tradeSetup.reason ??
+            'Trade setup is not available'}
+        </div>
+      )}
+
+    </div>
+  )}
+</section>
 
         <section className="rounded-xl border p-6">
           <h2 className="mb-4 text-xl font-semibold">

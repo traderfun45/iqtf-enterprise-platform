@@ -8,7 +8,7 @@ async function main() {
   const key = process.env.OPENAI_API_KEY
 
   const imageBuffer = await fs.readFile(imagePath)
-  const base64Image = imageBuffer.toString("base64")
+  const base64Image = Buffer.from(imageBuffer).toString("base64")
 
   const response = await fetch(
     "https://openrouter.ai/api/v1/chat/completions",

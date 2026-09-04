@@ -11,11 +11,20 @@ export type IqtfRiskState =
   | 'ELEVATED'
   | 'HIGH'
 
+export type IqtfTradePermission =
+  | 'ALLOWED'
+  | 'BLOCKED'
+
 export type IqtfDecisionResult = {
   compositeScore: number
   decision: IqtfDecision
   confidence: number
   riskState: IqtfRiskState
+
+  signalConflict: boolean
+
+  tradePermission: IqtfTradePermission
+  tradePermissionReason: string
 
   components: {
     market: number
@@ -85,7 +94,7 @@ export function calculateIqtfDecision(params: {
   )
 
   const cot = clamp(
-    params.cotScore ?? 0,
+    (params.cotScore ?? 0) / 3,
     -1,
     1,
   )
@@ -119,19 +128,50 @@ export function calculateIqtfDecision(params: {
     decision = 'SHORT_WATCH'
   }
 
+  /*
+   * SIGNAL CONFLICT GATE
+   *
+   * Composite score alone must NOT be allowed
+   * to generate a directional signal when
+   * Market and Institutional components disagree.
+   *
+   * Example:
+   *   Market      = BEARISH
+   *   CME         = BULLISH
+   *   Vol2Vol     = BULLISH
+   *   COT         = BULLISH
+   *
+   * Result:
+   *   NO_TRADE
+   *   HIGH risk
+   */
+
+  const bullishComponents =
+    Number(market > 0.25) +
+    Number(cme > 0.25) +
+    Number(vol2vol > 0.25) +
+    Number(cot > 0.25)
+
+  const bearishComponents =
+    Number(market < -0.25) +
+    Number(cme < -0.25) +
+    Number(vol2vol < -0.25) +
+    Number(cot < -0.25)
+
+  const hasConflictingSignals =
+    bullishComponents > 0 &&
+    bearishComponents > 0
+
+  if (hasConflictingSignals) {
+    decision = 'NO_TRADE'
+  }
+
   const confidence = Math.round(
     Math.abs(compositeScore) * 100,
   )
 
-  let riskState: IqtfRiskState = 'LOW'
+  let riskState: IqtfRiskState ='NORMAL'
 
-  if (confidence >= 80) {
-    riskState = 'HIGH'
-  } else if (confidence >= 60) {
-    riskState = 'ELEVATED'
-  } else if (confidence >= 35) {
-    riskState = 'NORMAL'
-  }
 
   const reasons: string[] = []
   const warnings: string[] = []
@@ -238,32 +278,97 @@ export function calculateIqtfDecision(params: {
   /*
    * CONFLICT WARNING
    */
-  const bullishComponents =
-    Number(market > 0.25) +
-    Number(cme > 0.25) +
-    Number(vol2vol > 0.25) +
-    Number(cot > 0.25)
 
-  const bearishComponents =
-    Number(market < -0.25) +
-    Number(cme < -0.25) +
-    Number(vol2vol < -0.25) +
-    Number(cot < -0.25)
+if (hasConflictingSignals) {
+  warnings.push(
+    'Market, CME, Vol2Vol and COT signals are conflicting',
+  )
+}
 
-  if (
-    bullishComponents > 0 &&
-    bearishComponents > 0
-  ) {
-    warnings.push(
-      'Market, CME, Vol2Vol and COT signals are conflicting',
-    )
+  /* FINAL RISK OVERRIDE */
+
+if (
+  params.volatilityRegime === 'HIGH' ||
+  hasConflictingSignals
+) {
+  riskState = 'HIGH'
+} else if (
+  params.volatilityRegime === 'ELEVATED' ||
+  params.cmeOiConfirmation === 'INSUFFICIENT_DATA'
+) {
+  riskState = 'ELEVATED'
+}
+
+
+  /* NO-TRADE EXPLANATION */
+
+  if (decision === 'NO_TRADE') {
+    if (hasConflictingSignals) {
+      reasons.push(
+        'Trade permission denied because Market and Institutional signals are conflicting',
+      )
+    } else {
+      reasons.push(
+        'Trade permission denied because composite score is below the trade threshold',
+      )
+    }
   }
+
+/*
+ * IQTF V3 TRADE PERMISSION GATE
+ *
+ * Directional signal and trade permission
+ * are intentionally separated.
+ */
+
+let tradePermission: IqtfTradePermission = 'BLOCKED'
+
+let tradePermissionReason =
+  'Trade blocked because decision is not LONG or SHORT'
+
+if (
+  (decision === 'LONG' ||
+    decision === 'SHORT') &&
+  !hasConflictingSignals
+) {
+  if (
+    params.volatilityRegime !== 'HIGH' &&
+    params.cmeOiConfirmation !== 'INSUFFICIENT_DATA'
+  ) {
+    tradePermission = 'ALLOWED'
+
+    tradePermissionReason =
+      'Trade allowed: directional signal confirmed and risk conditions are acceptable'
+  } else if (params.volatilityRegime === 'HIGH') {
+    tradePermissionReason =
+      'Trade blocked because volatility regime is HIGH'
+  } else {
+    tradePermissionReason =
+      'Trade blocked because Open Interest confirmation is insufficient'
+  }
+} else if (hasConflictingSignals) {
+  tradePermissionReason =
+    'Trade blocked because Market and Institutional signals are conflicting'
+} else if (decision === 'NO_TRADE') {
+  tradePermissionReason =
+    'Trade blocked because decision is NO_TRADE'
+} else {
+  tradePermissionReason =
+    'Trade blocked because decision requires confirmation'
+}
 
   return {
     compositeScore,
     decision,
     confidence,
     riskState,
+
+    signalConflict:
+      hasConflictingSignals,
+
+    tradePermission,
+
+    tradePermissionReason,
 
     components: {
       market,

@@ -22,7 +22,7 @@ function getOpenRouterClient() {
 
 export async function analyzeCmeImage(imagePath: string) {
   const imageBuffer = await fs.readFile(imagePath)
-  const base64Image = imageBuffer.toString("base64")
+  const base64Image = Buffer.from(imageBuffer).toString("base64")
 
   let response
   try {

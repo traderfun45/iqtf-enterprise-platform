@@ -43,6 +43,9 @@ import {
 import {
   calculateIqtfDecision,
 } from '../services/iqtfDecision.js'
+import {
+  calculateTradeSetup,
+} from '../services/tradeSetup.js'
 
 export async function institutionalRoutes(
   app: FastifyInstance,
@@ -194,16 +197,58 @@ export async function institutionalRoutes(
                 },
               )
 
+            const intelligence =
+              calculateMarketIntelligence(
+                candles,
+              )
+
+            const orderedCandles = [...candles].sort(
+              (a, b) =>
+                new Date(a.timestamp).getTime() -
+                new Date(b.timestamp).getTime(),
+            )
+
             return {
-              intelligence:
-                calculateMarketIntelligence(
-                  candles,
-                ),
+              intelligence,
+              currentPrice:
+                orderedCandles[orderedCandles.length - 1].close,
               candleCount:
                 candles.length,
             }
           },
         )
+
+
+      /*
+       * INSTITUTIONAL ALIGNMENT V3
+       *
+       * Institutional alignment uses CME + Vol2Vol + COT.
+       * Market score is intentionally excluded.
+       */
+
+      const institutionalScore =
+        cme.confirmationScore * 0.25 +
+        (vol2vol.score / 100) * 0.25 +
+        (cot.score / 3) * 0.15
+
+      const institutionalAlignment =
+        institutionalScore > 0.25
+          ? 'BULLISH'
+          : institutionalScore < -0.25
+            ? 'BEARISH'
+            : 'NEUTRAL'
+
+      const marketAlignment =
+        marketIntelligence.intelligence.score > 0.25
+          ? 'BULLISH'
+          : marketIntelligence.intelligence.score < -0.25
+            ? 'BEARISH'
+            : 'NEUTRAL'
+
+      const signalConflict =
+        marketAlignment !== 'NEUTRAL' &&
+        institutionalAlignment !== 'NEUTRAL' &&
+        marketAlignment !== institutionalAlignment
 
       const iqtfDecision =
         calculateIqtfDecision({
@@ -247,6 +292,22 @@ export async function institutionalRoutes(
             vol2vol.signal,
         })
 
+
+const tradeSetup = calculateTradeSetup({
+  decision: iqtfDecision.decision,
+  currentPrice:
+    marketIntelligence.currentPrice,
+  atr:
+    marketIntelligence.intelligence.volatility.atr,
+  riskState:
+    iqtfDecision.riskState,
+  tradePermission:
+    iqtfDecision.tradePermission,
+  tradePermissionReason:
+    iqtfDecision.tradePermissionReason,
+})
+
+
       return {
         success: true,
 
@@ -256,6 +317,7 @@ export async function institutionalRoutes(
           marketIntelligence.intelligence,
 
         iqtfDecision,
+      tradeSetup,
 
           summary: {
             decision: iqtfDecision.decision,
@@ -263,14 +325,12 @@ export async function institutionalRoutes(
             riskState: iqtfDecision.riskState,
             compositeScore: iqtfDecision.compositeScore,
 
-            institutionalAlignment:
-              iqtfDecision.compositeScore > 0.25
-                ? 'BULLISH'
-                : iqtfDecision.compositeScore < -0.25
-                  ? 'BEARISH'
-                  : 'NEUTRAL',
+            marketAlignment,
+            institutionalAlignment,
+            institutionalScore,
+            signalConflict,
 
-            components: iqtfDecision.components,
+components: iqtfDecision.components,
             reasons: iqtfDecision.reasons,
             warnings: iqtfDecision.warnings,
           },

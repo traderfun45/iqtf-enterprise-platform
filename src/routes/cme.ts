@@ -1,10 +1,10 @@
 import { runCmeOcr } from '../services/cmeOcr.js'
-import { analyzeCmeImageWithNvidia } from '../services/nvidiaVision.js'
 
+import { analyzeCmeImageWithNvidia } from '../services/nvidiaVision.js'
+import { parseCmeVol2Vol } from '../services/cmeVol2VolParser.js'
 import { normalizeCmeVision } from '../services/cmeVisionNormalizer.js'
 import { validateCmeVision } from '../services/cmeVisionValidator.js'
 import { analyzeCmeOptionIntelligence } from '../services/cmeOptionIntelligence.js'
-import { parseCmeVol2Vol } from '../services/cmeVol2VolParser.js'
 import fs from "node:fs/promises"
 import type { FastifyInstance } from 'fastify'
 
@@ -89,84 +89,102 @@ export async function cmeRoutes(
 
     try {
       const imageBuffer = Buffer.from(body.image, 'base64')
+      const tempPath = `./cme-ocr-${Date.now()}.jpg`
 
-        const tempPath = `./cme-ocr-${Date.now()}.png`
+      await fs.writeFile(tempPath, imageBuffer)
 
-await fs.writeFile(tempPath, imageBuffer)
+      try {
+        console.log('CME OCR: NVIDIA Vision started')
 
-try {
-  const visionResult = await analyzeCmeImageWithNvidia(tempPath)
-console.log(
-  'CME RAW VISION:',
-  JSON.stringify(visionResult, null, 2)
-)
-  const parsedVol2Vol = parseCmeVol2Vol(
-  visionResult.raw_text ?? '',
-)
+        const visionResult =
+          await analyzeCmeImageWithNvidia(tempPath)
 
-console.log(
-  'CME PARSED VOL2VOL:',
-  JSON.stringify(parsedVol2Vol, null, 2),
-)
+        console.log(
+          'CME RAW VISION:',
+          JSON.stringify(
+            visionResult,
+            null,
+            2,
+          ),
+        )
 
-const normalizedResult = normalizeCmeVision({
-  ...visionResult,
-  underlying_futures: [
-    {
-      symbol: 'GC',
-      settlement: parsedVol2Vol.futureSettlement,
-      price: parsedVol2Vol.futureSettlement,
-    },
-  ],
+        const parsedVol2Vol =
+          parseCmeVol2Vol(
+            visionResult.raw_text ?? '',
+          )
 
-volatility_settlement:
-  parsedVol2Vol.volatilitySettlement,
+        console.log(
+          'CME PARSED VOL2VOL:',
+          JSON.stringify(
+            parsedVol2Vol,
+            null,
+            2,
+          ),
+        )
 
-expectedRange:
-  parsedVol2Vol.expectedRange,
+        const normalizedResult =
+          normalizeCmeVision({
+            ...visionResult,
 
-call_volume:
-  parsedVol2Vol.callVolume,
+            underlying_futures: [
+              {
+                symbol: 'GC',
+                settlement:
+                  parsedVol2Vol.futureSettlement,
+                price:
+                  parsedVol2Vol.futureSettlement,
+              },
+            ],
 
-put_volume:
-  parsedVol2Vol.putVolume,
+            volatility_settlement:
+              parsedVol2Vol.volatilitySettlement,
 
-})
+            expectedRange:
+              parsedVol2Vol.expectedRange,
 
-console.log('CME STEP: before validation')
+            call_volume:
+              parsedVol2Vol.callVolume,
 
-const validation = validateCmeVision(normalizedResult)
+            put_volume:
+              parsedVol2Vol.putVolume,
+          })
 
-console.log('CME STEP: after validation')
+        console.log(
+          'CME NORMALIZED:',
+          JSON.stringify(
+            normalizedResult,
+            null,
+            2,
+          ),
+        )
 
-console.log('CME STEP: before option intelligence')
+        const validation =
+          validateCmeVision(
+            normalizedResult,
+          )
 
-const optionIntelligence =
-  analyzeCmeOptionIntelligence(
-    normalizedResult.optionRows,
-  )
+        const optionIntelligence =
+          analyzeCmeOptionIntelligence(
+            normalizedResult.optionRows,
+          )
 
-console.log('CME STEP: after option intelligence')
-
-console.log('CME STEP: before return')
-
-
-  return {
-    success: true,
-    data: normalizedResult,
-      optionIntelligence,
-    validation,
-  }
-} finally {
-
-  await fs.unlink(tempPath).catch(() => {})
-}
-     
-
-     
-        
+        return {
+          success: true,
+          data: normalizedResult,
+          rawVision: visionResult,
+          parsedVol2Vol,
+          optionIntelligence,
+          validation,
+        }
+      } finally {
+        await fs.unlink(tempPath).catch(() => {})
+      }
     } catch (error) {
-      console.error('CME OCR ERROR FULL:', JSON.stringify(error, null, 2)); console.error(error)
+      console.error(
+        'CME OCR ERROR FULL:',
+        JSON.stringify(error, null, 2),
+      )
+      console.error(error)
 
       return reply.code(500).send({
         error: 'OCR processing failed',
@@ -463,10 +481,19 @@ const vol2volState =
                 outputsize: 50,
               })
 
-              return {
-                intelligence: calculateMarketIntelligence(candles),
-                candleCount: candles.length,
-              }
+const orderedCandles = [...candles].sort(
+  (a, b) =>
+    new Date(a.timestamp).getTime() -
+    new Date(b.timestamp).getTime(),
+)
+
+return {
+  intelligence: calculateMarketIntelligence(candles),
+  currentPrice:
+    orderedCandles[orderedCandles.length - 1].close,
+  candleCount: candles.length,
+}
+
             },
           )
 
@@ -478,6 +505,18 @@ const vol2volState =
               intelligence.confirmationScore,
             vol2volScore:
               vol2vol.score,
+            marketSignal:
+              marketIntelligence.intelligence.signal,
+            marketStructure:
+              marketIntelligence.intelligence.structure.direction,
+            volatilityRegime:
+              marketIntelligence.intelligence.volatilityRegime.regime,
+            cmePositioning:
+              intelligence.positioning,
+            cmeOiConfirmation:
+              intelligence.oiConfirmation,
+            vol2volSignal:
+              vol2vol.signal,
           })
 
       return {

@@ -56,7 +56,10 @@ export default function CotAdminPage() {
         { cache: 'no-store' },
       )
 
-      const result = await response.json()
+      const result = (await response.json()) as {
+        data?: CotData[]
+        error?: string
+      }
       setHistory(result.data ?? [])
     } catch {
       setMessage('Unable to load COT history')
@@ -75,8 +78,8 @@ export default function CotAdminPage() {
         return
       }
 
-      const result = await response.json()
-      setAnalysis(result.intelligence ?? null)
+      const result = (await response.json()) as CotAnalysis
+      setAnalysis(result)
     } catch {
       setAnalysis(null)
     }
@@ -114,7 +117,9 @@ export default function CotAdminPage() {
         body: JSON.stringify(form),
       })
 
-      const result = await response.json()
+      const result = (await response.json()) as {
+        error?: string
+      }
 
       if (!response.ok) {
         throw new Error(
