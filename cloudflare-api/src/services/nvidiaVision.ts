@@ -19,7 +19,10 @@ export async function analyzeCmeImageWithNvidia(
   }
 
   const cleanBase64 = imageBase64
-    .replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '')
+    .replace(
+      /^data:image\/[a-zA-Z0-9.+-]+;base64,/,
+      '',
+    )
     .trim()
 
   if (!cleanBase64) {
@@ -43,22 +46,36 @@ export async function analyzeCmeImageWithNvidia(
             {
               type: 'text',
               text: `
-You are an OCR engine for CME Gold / Vol2Vol screenshots.
+OCR TASK ONLY.
 
-Transcribe ONLY text and numbers that are visibly present in the image.
+Read the CME Gold / Vol2Vol screenshot.
+Do NOT describe the image.
+Do NOT explain the image.
+Do NOT summarize the image.
+Do NOT analyze the market.
+Do NOT calculate anything.
+Do NOT infer values that are not visible.
 
-Do NOT infer missing values.
-Do NOT calculate values.
-Do NOT correct values.
-Preserve signed labels exactly.
+Your ONLY task is to transcribe visible text and numbers.
 
-Pay special attention to:
+CRITICAL:
+- Read the actual table/chart labels and numeric values.
+- Preserve decimal points exactly.
+- Preserve commas in numbers when visible.
+- Preserve + and - signs exactly.
+- Preserve labels exactly as shown.
+- Never convert +1, +2, +3 into 1SD, 2SD, 3SD.
+- Never convert 1SD into +1.
+- Never calculate missing values.
+- Never replace an unreadable value with a guessed value.
 
+PRIORITY FIELDS:
 Future Stl
 Vol Stl
-Puts
 Calls
-Expected Range
+Puts
+
+Expected Range:
 ATM
 +1
 +2
@@ -66,33 +83,36 @@ ATM
 -1
 -2
 -3
+
+Also transcribe visible:
+Future
+Strike
+Volatility
+OI
+Change
+Upper
+Lower
+High
+Low
 1SD
 2SD
 3SD
 -1SD
 -2SD
 -3SD
-Upper
-Lower
-High
-Low
-Future
-Strike
-Volatility
-OI
-Change
 
-IMPORTANT:
-If the screenshot explicitly shows +1, +2, +3, preserve those labels.
-Do NOT convert +1/+2/+3 into 1SD/2SD/3SD.
-
-Return ONLY valid JSON:
+Return ONLY this JSON object.
+No markdown.
+No explanation.
 
 {
   "screenshot_type": "CME Options / Vol2Vol",
-  "raw_text": "all visible relevant text",
+  "raw_text": "verbatim transcription of all relevant visible text and numbers",
   "unreadable_or_missing_information": []
 }
+
+If something important is genuinely unreadable, put its label in unreadable_or_missing_information.
+Do not invent its value.
 `,
             },
             {
