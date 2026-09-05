@@ -202,6 +202,135 @@ export default {
     }
 
     // =========================================================
+    // POST /api/cme/nvidia-vision-test
+    // NVIDIA Vision direct diagnostic
+    // =========================================================
+    if (
+      url.pathname === '/api/cme/nvidia-vision-test' &&
+      request.method === 'POST'
+    ) {
+      if (!env.NVIDIA_API_KEY) {
+        return json(
+          {
+            success: false,
+            error: 'NVIDIA_API_KEY is not configured',
+          },
+          500,
+        )
+      }
+
+      const startedAt = Date.now()
+
+      try {
+        const body = (await request.json()) as {
+          image?: string
+        }
+
+        if (!body.image) {
+          return json(
+            {
+              success: false,
+              error: 'image is required',
+            },
+            400,
+          )
+        }
+
+        const cleanBase64 = body.image.replace(
+          /^data:image\/[^;]+;base64,/,
+          '',
+        )
+
+        console.log('[NVIDIA VISION TEST] START', {
+          imageBase64Length: cleanBase64.length,
+        })
+
+        const controller = new AbortController()
+        const timeout = setTimeout(
+          () => controller.abort(),
+          60_000,
+        )
+
+        let response: Response
+
+        try {
+          response = await fetch(
+            'https://integrate.api.nvidia.com/v1/chat/completions',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${env.NVIDIA_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'meta/llama-3.2-11b-vision-instruct',
+                temperature: 0,
+                max_tokens: 500,
+                messages: [
+                  {
+                    role: 'user',
+                    content: [
+                      {
+                        type: 'text',
+                        text: 'Read this image. Return a very short description of what is visible.',
+                      },
+                      {
+                        type: 'image_url',
+                        image_url: {
+                          url: `data:image/jpeg;base64,${cleanBase64}`,
+                        },
+                      },
+                    ],
+                  },
+                ],
+              }),
+              signal: controller.signal,
+            },
+          )
+        } finally {
+          clearTimeout(timeout)
+        }
+
+        const text = await response.text()
+
+        const elapsedMs = Date.now() - startedAt
+
+        console.log('[NVIDIA VISION TEST] RESPONSE', {
+          status: response.status,
+          elapsedMs,
+          responseLength: text.length,
+        })
+
+        return json({
+          success: response.ok,
+          status: response.status,
+          elapsedMs,
+          responseLength: text.length,
+          body: text.slice(0, 3000),
+        })
+      } catch (error) {
+        const elapsedMs = Date.now() - startedAt
+
+        console.error('[NVIDIA VISION TEST] ERROR', {
+          elapsedMs,
+          error,
+        })
+
+        return json(
+          {
+            success: false,
+            elapsedMs,
+            error:
+              error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error),
+          },
+          500,
+        )
+      }
+    }
+
+    // =========================================================
     // POST /api/cme/ocr
     // NVIDIA Vision -> CME Vol2Vol Parser -> Normalizer
     // =========================================================
