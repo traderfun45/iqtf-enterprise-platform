@@ -222,28 +222,7 @@ export default {
       const startedAt = Date.now()
 
       try {
-        const body = (await request.json()) as {
-          image?: string
-        }
-
-        if (!body.image) {
-          return json(
-            {
-              success: false,
-              error: 'image is required',
-            },
-            400,
-          )
-        }
-
-        const cleanBase64 = body.image.replace(
-          /^data:image\/[^;]+;base64,/,
-          '',
-        )
-
-        console.log('[NVIDIA VISION TEST] START', {
-          imageBase64Length: cleanBase64.length,
-        })
+        console.log('[NVIDIA TEXT TEST] START')
 
         const controller = new AbortController()
         const timeout = setTimeout(
@@ -272,13 +251,7 @@ export default {
                     content: [
                       {
                         type: 'text',
-                        text: 'Read this image. Return a very short description of what is visible.',
-                      },
-                      {
-                        type: 'image_url',
-                        image_url: {
-                          url: `data:image/jpeg;base64,${cleanBase64}`,
-                        },
+                        text: 'Reply with exactly: NVIDIA TEXT TEST OK',
                       },
                     ],
                   },
@@ -295,7 +268,7 @@ export default {
 
         const elapsedMs = Date.now() - startedAt
 
-        console.log('[NVIDIA VISION TEST] RESPONSE', {
+        console.log('[NVIDIA TEXT TEST] RESPONSE', {
           status: response.status,
           elapsedMs,
           responseLength: text.length,
@@ -311,7 +284,7 @@ export default {
       } catch (error) {
         const elapsedMs = Date.now() - startedAt
 
-        console.error('[NVIDIA VISION TEST] ERROR', {
+        console.error('[NVIDIA TEXT TEST] ERROR', {
           elapsedMs,
           error,
         })
