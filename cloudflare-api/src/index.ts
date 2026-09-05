@@ -13,6 +13,9 @@ function json(data: unknown, status = 200): Response {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': 'https://iqtf-enterprise-dashboard.traderfun45.workers.dev',
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   })
 }
@@ -106,6 +109,20 @@ function cmeZScore(
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin':
+            'https://iqtf-enterprise-dashboard.traderfun45.workers.dev',
+          'Access-Control-Allow-Methods':
+            'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+          'Access-Control-Allow-Headers':
+            'Content-Type, Authorization',
+        },
+      })
+    }
 
     // =========================================================
     // GET /health
