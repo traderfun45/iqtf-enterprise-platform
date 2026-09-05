@@ -4,6 +4,7 @@ import { normalizeCmeVision } from './services/cmeVisionNormalizer.js'
 import { verifyPassword } from './services/password.js'
 import { listMarkets, getMarketBySymbol } from './market/markets.js'
 import { getMarketProvider } from './market/provider.js'
+import { calculateMarketIntelligence } from './services/market/intelligence.js'
 
 export interface Env {
   DB: D1Database
@@ -141,6 +142,47 @@ export default {
 
 
     // =========================================================
+    // GET /api/system/status
+    if (url.pathname === '/api/system/status' && request.method === 'GET') {
+      return json({
+        service: 'iqtf-cloudflare-api',
+        status: 'healthy',
+        process: {
+          pid: 0,
+          uptimeSeconds: 0,
+          startedAt: new Date().toISOString(),
+          nodeVersion: 'cloudflare-workers',
+          platform: 'cloudflare',
+          arch: 'edge',
+        },
+        memory: {
+          rssBytes: 0,
+          heapUsedBytes: 0,
+          heapTotalBytes: 0,
+          externalBytes: 0,
+          arrayBuffersBytes: 0,
+        },
+        cpu: {
+          userMicros: 0,
+          systemMicros: 0,
+        },
+        system: {
+          hostname: 'cloudflare-worker',
+          loadAverage: [],
+          cpuCount: 0,
+          totalMemoryBytes: 0,
+          freeMemoryBytes: 0,
+        },
+        services: {
+          api: 'healthy',
+          market: 'healthy',
+          cache: 'healthy',
+          watchdog: 'healthy',
+        },
+        timestamp: new Date().toISOString(),
+      })
+    }
+
     // GET /api/markets
     // List supported markets
     // =========================================================
@@ -203,6 +245,112 @@ export default {
 
     // =========================================================
     // =========================================================
+    // GET /api/market/snapshot
+    if (url.pathname === '/api/market/snapshot' && request.method === 'GET') {
+      try {
+        const markets = await listMarkets(env.DB)
+        const quotes = await Promise.all(
+          markets.map(async (market) => {
+            const provider = getMarketProvider(market.provider, env)
+            return provider.getQuote(market.symbol)
+          }),
+        )
+
+        return json({
+          data: quotes,
+          timestamp: new Date().toISOString(),
+        })
+      } catch (error) {
+        return json(
+          {
+            success: false,
+            error: error instanceof Error
+              ? error.message
+              : 'Failed to load market snapshot',
+          },
+          500,
+        )
+      }
+    }
+
+    // GET /api/market/intelligence?symbol=XAUUSD&interval=1h&outputsize=50
+    // Calculate market intelligence from historical candles
+    // =========================================================
+    if (url.pathname === '/api/market/intelligence' && request.method === 'GET') {
+      try {
+        const symbol = (url.searchParams.get('symbol') || '').trim().toUpperCase()
+        const interval = url.searchParams.get('interval') || '1h'
+        const rawOutputsize = url.searchParams.get('outputsize')
+        const outputsize = rawOutputsize ? Number(rawOutputsize) : 50
+
+        if (!symbol) {
+          return json(
+            { success: false, error: 'symbol query parameter is required' },
+            400,
+          )
+        }
+
+        if (!Number.isInteger(outputsize) || outputsize < 2) {
+          return json(
+            { success: false, error: 'outputsize must be an integer >= 2' },
+            400,
+          )
+        }
+
+        const market = await getMarketBySymbol(env.DB, symbol)
+
+        if (!market) {
+          return json(
+            { success: false, error: 'Market not found', symbol },
+            404,
+          )
+        }
+
+        const provider = getMarketProvider(market.provider, env)
+
+        if (typeof provider.getHistory !== 'function') {
+          return json(
+            {
+              success: false,
+              error: 'Historical data is not supported by this provider',
+              symbol,
+              provider: market.provider ?? 'unknown',
+            },
+            501,
+          )
+        }
+
+        const candles = await provider.getHistory(symbol, {
+          interval,
+          outputsize,
+        })
+
+        if (candles.length === 0) {
+          return json(
+            { success: false, error: 'No historical market data available', symbol },
+            404,
+          )
+        }
+
+        const intelligence = calculateMarketIntelligence(candles)
+
+        return json({
+          ...intelligence,
+          interval,
+          candleCount: candles.length,
+        })
+      } catch (error) {
+        return json(
+          {
+            success: false,
+            error: 'Market intelligence unavailable',
+            message: error instanceof Error ? error.message : 'Market intelligence error',
+          },
+          502,
+        )
+      }
+    }
+
     // GET /api/market/quote?symbol=XAUUSD
     // Get current market quote through the configured provider
     // =========================================================
