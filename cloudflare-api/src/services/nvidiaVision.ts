@@ -30,6 +30,7 @@ export async function analyzeCmeImageWithNvidia(
   }
 
   const fetchStartedAt = Date.now()
+
   console.log('[NVIDIA] FETCH START', {
     model: NVIDIA_MODEL,
     imageBase64Length: cleanBase64.length,
@@ -51,10 +52,10 @@ export async function analyzeCmeImageWithNvidia(
           content: [
             {
               type: 'text',
-              text: `
-OCR TASK ONLY.
+              text: `OCR TASK ONLY.
 
 Read the CME Gold / Vol2Vol screenshot.
+
 Do NOT describe the image.
 Do NOT explain the image.
 Do NOT summarize the image.
@@ -76,6 +77,7 @@ CRITICAL:
 - Never replace an unreadable value with a guessed value.
 
 PRIORITY FIELDS:
+
 Future Stl
 Vol Stl
 Calls
