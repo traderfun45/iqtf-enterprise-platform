@@ -36,8 +36,14 @@ export async function analyzeCmeImageWithNvidia(
     imageBase64Length: cleanBase64.length,
   })
 
-  const response = await fetch(NVIDIA_ENDPOINT, {
-    method: 'POST',
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 60_000)
+
+  let response: Response
+
+  try {
+    response = await fetch(NVIDIA_ENDPOINT, {
+      method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
@@ -132,8 +138,17 @@ Do not invent its value.
           ],
         },
       ],
-    }),
-  })
+      }),
+    })
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('NVIDIA Vision fetch timeout after 60 seconds')
+    }
+
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
 
   console.log('[NVIDIA] FETCH RESPONSE', {
     status: response.status,
