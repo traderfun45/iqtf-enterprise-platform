@@ -67,3 +67,34 @@ next-env.d.ts
 # IQTF test output
 /iqtf-institutional-v3.json
 /.runtime-test/
+
+# IQTF OCR / Vision local experiments
+*.before-*
+*.broken
+*.ck
+*.b64
+/cme-crops/
+/cme-ocr-request*.json
+/cme-ocr-result.json
+/cme-request.json
+/nvidia-chart-test.json
+/nvidia-chart-result.json
+/test-nvidia.json
+/test_ocr.py
+
+# Local OCR screenshots / crops
+/cme-vol2vol-*.jpg
+/paddleocr1.png
+
+# IQTF local backup variants
+*.bak*
+*.openrouter-402-backup
+*.before-*
+*.ck
+
+# IQTF local backup / diagnostic artifacts
+*.bak*
+*.before-*
+*.openrouter-402-backup
+*.ck
+/core
