@@ -2,6 +2,7 @@ import { analyzeCmeImageWithNvidia } from './services/nvidiaVision.js'
 import { parseCmeVol2Vol } from './services/cmeVol2VolParser.js'
 import { normalizeCmeVision } from './services/cmeVisionNormalizer.js'
 import { verifyPassword } from './services/password.js'
+import { listMarkets, getMarketBySymbol } from './market/markets.js'
 
 export interface Env {
   DB: D1Database
@@ -137,6 +138,67 @@ export default {
       })
     }
 
+
+    // =========================================================
+    // GET /api/markets
+    // List supported markets
+    // =========================================================
+    if (url.pathname === '/api/markets' && request.method === 'GET') {
+      try {
+        const markets = await listMarkets(env.DB)
+
+        return json({
+          success: true,
+          markets,
+        })
+      } catch (error) {
+        return json(
+          {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to load markets',
+          },
+          500,
+        )
+      }
+    }
+
+    // =========================================================
+    // GET /api/markets/:symbol
+    // Get one market
+    // =========================================================
+    if (
+      url.pathname.startsWith('/api/markets/') &&
+      request.method === 'GET'
+    ) {
+      try {
+        const symbol = url.pathname.split('/').pop() || ''
+        const market = await getMarketBySymbol(env.DB, symbol)
+
+        if (!market) {
+          return json(
+            {
+              success: false,
+              error: 'Market not found',
+              symbol: symbol.toUpperCase(),
+            },
+            404,
+          )
+        }
+
+        return json({
+          success: true,
+          market,
+        })
+      } catch (error) {
+        return json(
+          {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to load market',
+          },
+          500,
+        )
+      }
+    }
 
     // =========================================================
     // GET /api/cme/nvidia-test
