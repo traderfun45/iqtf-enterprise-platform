@@ -1,6 +1,7 @@
 import { analyzeCmeImageWithNvidia } from './services/nvidiaVision.js'
 import { parseCmeVol2Vol } from './services/cmeVol2VolParser.js'
 import { normalizeCmeVision } from './services/cmeVisionNormalizer.js'
+import { verifyPassword } from './services/password.js'
 
 export interface Env {
   DB: D1Database
@@ -2007,6 +2008,106 @@ if (
         return json({
           success: false,
           error: 'Failed to delete trade plan',
+        }, 500)
+      }
+    }
+
+    // =========================================================
+    // AUTH
+    // =========================================================
+
+    // POST /login
+    if (
+      url.pathname === '/login' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const body = (await request.json()) as {
+          email?: string
+          password?: string
+        }
+
+        if (!body?.email || typeof body.email !== 'string') {
+          return json({
+            success: false,
+            error: 'email is required',
+          }, 400)
+        }
+
+        if (!body?.password || typeof body.password !== 'string') {
+          return json({
+            success: false,
+            error: 'password is required',
+          }, 400)
+        }
+
+        const email = body.email.trim().toLowerCase()
+        const password = body.password
+
+        if (!email) {
+          return json({
+            success: false,
+            error: 'email is required',
+          }, 400)
+        }
+
+        const user = await env.DB.prepare(`
+          SELECT
+            id,
+            email,
+            name,
+            role,
+            password_hash,
+            created_at
+          FROM users
+          WHERE email = ?
+          LIMIT 1
+        `)
+          .bind(email)
+          .first<{
+            id: number
+            email: string
+            name: string | null
+            role: string
+            password_hash: string | null
+            created_at: string
+          }>()
+
+        if (!user || !user.password_hash) {
+          return json({
+            success: false,
+            error: 'Invalid email or password',
+          }, 401)
+        }
+
+        const valid = await verifyPassword(
+          password,
+          user.password_hash,
+        )
+
+        if (!valid) {
+          return json({
+            success: false,
+            error: 'Invalid email or password',
+          }, 401)
+        }
+
+        return json({
+          success: true,
+          data: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            created_at: user.created_at,
+          },
+        })
+      } catch (error) {
+        console.error('POST /login error:', error)
+
+        return json({
+          success: false,
+          error: 'Login failed',
         }, 500)
       }
     }
