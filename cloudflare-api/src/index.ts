@@ -203,7 +203,111 @@ export default {
 
     // =========================================================
     // POST /api/cme/nvidia-vision-test
-    // NVIDIA Vision direct diagnostic
+// NVIDIA tiny-image diagnostic
+if (
+  url.pathname === '/api/cme/nvidia-vision-test' &&
+  request.method === 'POST'
+) {
+  if (!env.NVIDIA_API_KEY) {
+    return json(
+      {
+        success: false,
+        error: 'NVIDIA_API_KEY is not configured',
+      },
+      500,
+    )
+  }
+
+  const startedAt = Date.now()
+
+  // 1x1 transparent PNG
+  const tinyImageBase64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+
+  try {
+    console.log('[NVIDIA TINY IMAGE TEST] START')
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 60_000)
+
+    let response: Response
+
+    try {
+      response = await fetch(
+        'https://integrate.api.nvidia.com/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${env.NVIDIA_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'meta/llama-3.2-11b-vision-instruct',
+            temperature: 0,
+            max_tokens: 100,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Reply with exactly: TINY IMAGE TEST OK',
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:image/png;base64,${tinyImageBase64}`,
+                    },
+                  },
+                ],
+              },
+            ],
+          }),
+          signal: controller.signal,
+        },
+      )
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    const text = await response.text()
+    const elapsedMs = Date.now() - startedAt
+
+    console.log('[NVIDIA TINY IMAGE TEST] RESPONSE', {
+      status: response.status,
+      elapsedMs,
+      responseLength: text.length,
+    })
+
+    return json({
+      success: response.ok,
+      status: response.status,
+      elapsedMs,
+      responseLength: text.length,
+      body: text.slice(0, 3000),
+    })
+  } catch (error) {
+    const elapsedMs = Date.now() - startedAt
+
+    console.error('[NVIDIA TINY IMAGE TEST] ERROR', {
+      elapsedMs,
+      error,
+    })
+
+    return json(
+      {
+        success: false,
+        elapsedMs,
+        error:
+          error instanceof Error
+            ? `${error.name}: ${error.message}`
+            : String(error),
+      },
+      500,
+    )
+  }
+}
+
     // =========================================================
     if (
       url.pathname === '/api/cme/nvidia-vision-test' &&
@@ -222,7 +326,28 @@ export default {
       const startedAt = Date.now()
 
       try {
-        console.log('[NVIDIA TEXT TEST] START')
+        const body = (await request.json()) as {
+          image?: string
+        }
+
+        if (!body.image) {
+          return json(
+            {
+              success: false,
+              error: 'image is required',
+            },
+            400,
+          )
+        }
+
+        const cleanBase64 = body.image.replace(
+          /^data:image\/[^;]+;base64,/,
+          '',
+        )
+
+        console.log('[NVIDIA VISION TEST] START', {
+          imageBase64Length: cleanBase64.length,
+        })
 
         const controller = new AbortController()
         const timeout = setTimeout(
@@ -251,7 +376,13 @@ export default {
                     content: [
                       {
                         type: 'text',
-                        text: 'Reply with exactly: NVIDIA TEXT TEST OK',
+                        text: 'Read this image. Return a very short description of what is visible.',
+                      },
+                      {
+                        type: 'image_url',
+                        image_url: {
+                          url: `data:image/jpeg;base64,${cleanBase64}`,
+                        },
                       },
                     ],
                   },
@@ -268,7 +399,7 @@ export default {
 
         const elapsedMs = Date.now() - startedAt
 
-        console.log('[NVIDIA TEXT TEST] RESPONSE', {
+        console.log('[NVIDIA VISION TEST] RESPONSE', {
           status: response.status,
           elapsedMs,
           responseLength: text.length,
@@ -284,7 +415,7 @@ export default {
       } catch (error) {
         const elapsedMs = Date.now() - startedAt
 
-        console.error('[NVIDIA TEXT TEST] ERROR', {
+        console.error('[NVIDIA VISION TEST] ERROR', {
           elapsedMs,
           error,
         })
