@@ -141,11 +141,23 @@ Do not invent its value.
       }),
     })
   } catch (error) {
+    const elapsedMs = Date.now() - fetchStartedAt
+
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('NVIDIA Vision fetch timeout after 60 seconds')
+      throw new Error(
+        `NVIDIA Vision fetch timeout after 60 seconds (elapsed ${elapsedMs} ms)`,
+      )
     }
 
-    throw error
+    if (error instanceof Error) {
+      throw new Error(
+        `NVIDIA Vision fetch error after ${elapsedMs} ms: ${error.name}: ${error.message}`,
+      )
+    }
+
+    throw new Error(
+      `NVIDIA Vision fetch error after ${elapsedMs} ms: ${String(error)}`,
+    )
   } finally {
     clearTimeout(timeout)
   }
