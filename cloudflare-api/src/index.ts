@@ -121,6 +121,87 @@ export default {
 
 
     // =========================================================
+    // GET /api/cme/nvidia-test
+    // NVIDIA connectivity diagnostic
+    // =========================================================
+    if (
+      url.pathname === '/api/cme/nvidia-test' &&
+      request.method === 'GET'
+    ) {
+      if (!env.NVIDIA_API_KEY) {
+        return json(
+          {
+            success: false,
+            error: 'NVIDIA_API_KEY is not configured',
+          },
+          500,
+        )
+      }
+
+      const startedAt = Date.now()
+
+      try {
+        console.log('[NVIDIA TEST] FETCH START')
+
+        const controller = new AbortController()
+        const timeout = setTimeout(
+          () => controller.abort(),
+          30_000,
+        )
+
+        let response: Response
+
+        try {
+          response = await fetch(
+            'https://integrate.api.nvidia.com/v1/models',
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${env.NVIDIA_API_KEY}`,
+              },
+              signal: controller.signal,
+            },
+          )
+        } finally {
+          clearTimeout(timeout)
+        }
+
+        const text = await response.text()
+
+        console.log('[NVIDIA TEST] FETCH RESPONSE', {
+          status: response.status,
+          elapsedMs: Date.now() - startedAt,
+        })
+
+        return json({
+          success: response.ok,
+          status: response.status,
+          elapsedMs: Date.now() - startedAt,
+          body: text.slice(0, 2000),
+        })
+      } catch (error) {
+        const elapsedMs = Date.now() - startedAt
+
+        console.error('[NVIDIA TEST] ERROR', {
+          elapsedMs,
+          error,
+        })
+
+        return json(
+          {
+            success: false,
+            elapsedMs,
+            error:
+              error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error),
+          },
+          500,
+        )
+      }
+    }
+
+    // =========================================================
     // POST /api/cme/ocr
     // NVIDIA Vision -> CME Vol2Vol Parser -> Normalizer
     // =========================================================
