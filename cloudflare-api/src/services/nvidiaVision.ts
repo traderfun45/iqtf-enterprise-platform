@@ -29,6 +29,12 @@ export async function analyzeCmeImageWithNvidia(
     throw new Error('Image base64 is empty')
   }
 
+  const fetchStartedAt = Date.now()
+  console.log('[NVIDIA] FETCH START', {
+    model: NVIDIA_MODEL,
+    imageBase64Length: cleanBase64.length,
+  })
+
   const response = await fetch(NVIDIA_ENDPOINT, {
     method: 'POST',
     headers: {
@@ -127,7 +133,19 @@ Do not invent its value.
     }),
   })
 
+  console.log('[NVIDIA] FETCH RESPONSE', {
+    status: response.status,
+    elapsedMs: Date.now() - fetchStartedAt,
+  })
+
+  const responseTextStartedAt = Date.now()
   const responseText = await response.text()
+
+  console.log('[NVIDIA] RESPONSE TEXT COMPLETE', {
+    elapsedMs: Date.now() - responseTextStartedAt,
+    totalElapsedMs: Date.now() - fetchStartedAt,
+    responseTextLength: responseText.length,
+  })
 
   if (!response.ok) {
     throw new Error(
