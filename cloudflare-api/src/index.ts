@@ -3,6 +3,7 @@ import { parseCmeVol2Vol } from './services/cmeVol2VolParser.js'
 import { normalizeCmeVision } from './services/cmeVisionNormalizer.js'
 import { verifyPassword } from './services/password.js'
 import { listMarkets, getMarketBySymbol } from './market/markets.js'
+import { getMarketProvider } from './market/provider.js'
 
 export interface Env {
   DB: D1Database
@@ -201,6 +202,56 @@ export default {
     }
 
     // =========================================================
+    // =========================================================
+    // GET /api/market/quote?symbol=XAUUSD
+    // Get current market quote through the configured provider
+    // =========================================================
+    if (url.pathname === '/api/market/quote' && request.method === 'GET') {
+      try {
+        const symbol = (url.searchParams.get('symbol') || '').trim().toUpperCase()
+
+        if (!symbol) {
+          return json(
+            {
+              success: false,
+              error: 'symbol query parameter is required',
+            },
+            400,
+          )
+        }
+
+        const market = await getMarketBySymbol(env.DB, symbol)
+
+        if (!market) {
+          return json(
+            {
+              success: false,
+              error: 'Market not found',
+              symbol,
+            },
+            404,
+          )
+        }
+
+        const provider = getMarketProvider(market.provider, env)
+        const quote = await provider.getQuote(market.symbol)
+
+        return json({
+          success: true,
+          market,
+          quote,
+        })
+      } catch (error) {
+        return json(
+          {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to load market quote',
+          },
+          500,
+        )
+      }
+    }
+
     // GET /api/cme/nvidia-test
     // NVIDIA connectivity diagnostic
     // =========================================================
