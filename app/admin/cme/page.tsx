@@ -117,7 +117,59 @@ export default function CmeAdminPage() {
   setMessage(`Image selected: ${file.name}`)
 }
 
- async function handleScanImage() {
+ function preprocessCmeImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onerror = () => {
+      reject(new Error('Failed to read CME image'))
+    }
+
+    reader.onload = () => {
+      const img = new Image()
+
+      img.onerror = () => {
+        reject(new Error('Failed to decode CME image'))
+      }
+
+      img.onload = () => {
+        const scale = 0.5
+
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(img.naturalWidth * scale)
+        canvas.height = Math.round(img.naturalHeight * scale)
+
+        const ctx = canvas.getContext('2d')
+
+        if (!ctx) {
+          reject(new Error('Canvas is not supported'))
+          return
+        }
+
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        )
+
+        const dataUrl = canvas.toDataURL(
+          'image/jpeg',
+          0.65,
+        )
+
+        resolve(dataUrl)
+      }
+
+      img.src = reader.result as string
+    }
+
+    reader.readAsDataURL(file)
+  })
+}
+
+async function handleScanImage() {
   if (!selectedImage) {
     setMessage('Please select a CME screenshot first')
     return
@@ -127,16 +179,8 @@ export default function CmeAdminPage() {
   setMessage('Scanning CME screenshot...')
 
   try {
-    const buffer = await selectedImage.arrayBuffer()
-
-    let binary = ''
-    const bytes = new Uint8Array(buffer)
-
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-
-    const base64 = btoa(binary)
+    const dataUrl = await preprocessCmeImage(selectedImage)
+    const base64 = dataUrl.split(',')[1]
 
     const response = await fetch(`${API}/api/cme/ocr`, {
       method: 'POST',
