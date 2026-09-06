@@ -21,9 +21,11 @@ import {
 } from "@/components/ui/card"
 import { AppShell } from "@/components/layout/app-shell"
 import {
+  getInstitutionalAnalysis,
   getMarketIntelligence,
   getMarketSnapshot,
   type Intelligence,
+  type InstitutionalAnalysis,
   type Quote,
 } from "@/lib/market"
 import {
@@ -52,11 +54,37 @@ function formatUptime(seconds: number) {
 }
 
 function directionClass(
-  direction?: "bullish" | "bearish" | "neutral" | "mixed",
+  direction?:
+    | "bullish"
+    | "bearish"
+    | "neutral"
+    | "mixed"
+    | "LONG"
+    | "LONG_WATCH"
+    | "NO_TRADE"
+    | "SHORT_WATCH"
+    | "SHORT",
 ) {
-  if (direction === "bullish") return "text-emerald-400"
-  if (direction === "bearish") return "text-red-400"
-  if (direction === "mixed") return "text-amber-400"
+  if (
+    direction === "bullish" ||
+    direction === "LONG" ||
+    direction === "LONG_WATCH"
+  ) {
+    return "text-emerald-400"
+  }
+
+  if (
+    direction === "bearish" ||
+    direction === "SHORT" ||
+    direction === "SHORT_WATCH"
+  ) {
+    return "text-red-400"
+  }
+
+  if (direction === "mixed" || direction === "NO_TRADE") {
+    return "text-amber-400"
+  }
+
   return "text-zinc-400"
 }
 
@@ -89,6 +117,8 @@ export default function Home() {
   const [gc, setGc] = useState<Quote | null>(null)
   const [intelligence, setIntelligence] =
     useState<Intelligence | null>(null)
+  const [institutional, setInstitutional] =
+    useState<InstitutionalAnalysis | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -542,6 +572,219 @@ export default function Home() {
             </CardContent>
           </Card>
         </div>
+
+        {/* IQTF Executive Decision */}
+        <Card className="border-white/10 bg-white/[0.03]">
+          <CardHeader>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-base text-white">
+                  IQTF Executive Decision
+                </CardTitle>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Institutional decision engine · CME + Vol2Vol + COT + Market
+                </p>
+              </div>
+
+              <Badge
+                variant="outline"
+                className={
+                  institutional?.iqtfDecision?.decision === "LONG" ||
+                  institutional?.iqtfDecision?.decision === "SHORT"
+                    ? "border-emerald-500/30 text-emerald-400"
+                    : "border-amber-500/30 text-amber-400"
+                }
+              >
+                {institutional?.iqtfDecision?.decision ?? "—"}
+              </Badge>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-4 xl:grid-cols-12">
+
+              {/* Decision */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-5 xl:col-span-4">
+                <div className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  IQTF Decision
+                </div>
+
+                <div
+                  className={`mt-3 text-3xl font-bold ${directionClass(
+                    institutional?.iqtfDecision?.decision,
+                  )}`}
+                >
+                  {institutional?.iqtfDecision?.decision ?? "—"}
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-zinc-500">Confidence</div>
+                    <div className="mt-1 text-lg font-semibold text-white">
+                      {institutional?.iqtfDecision?.confidence != null
+                        ? `${institutional.iqtfDecision.confidence}%`
+                        : "—"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-zinc-500">Risk State</div>
+                    <div className="mt-1 text-lg font-semibold text-white">
+                      {institutional?.iqtfDecision?.riskState ?? "—"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                  <div className="text-xs text-zinc-500">Trade Permission</div>
+                  <div
+                    className={`mt-1 text-sm font-semibold ${
+                      institutional?.iqtfDecision?.tradePermission === "ALLOWED"
+                        ? "text-emerald-400"
+                        : "text-red-400"
+                    }`}
+                  >
+                    {institutional?.iqtfDecision?.tradePermission ?? "—"}
+                  </div>
+
+                  <div className="mt-1 text-xs text-zinc-600">
+                    {institutional?.iqtfDecision?.tradePermissionReason ??
+                      institutional?.iqtfDecision?.reasons?.[0] ??
+                      "No decision reason available"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Signal Matrix */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-5 xl:col-span-4">
+                <div className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Signal Matrix
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {[
+                    ["Market", institutional?.iqtfDecision?.components?.market],
+                    ["CME", institutional?.iqtfDecision?.components?.cme],
+                    ["Vol2Vol", institutional?.iqtfDecision?.components?.vol2vol],
+                    ["COT", institutional?.iqtfDecision?.components?.cot],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2"
+                    >
+                      <span className="text-sm text-zinc-400">{label}</span>
+                      <span
+                        className={`font-mono text-sm font-semibold ${
+                          typeof value === "number" && value > 0
+                            ? "text-emerald-400"
+                            : typeof value === "number" && value < 0
+                              ? "text-red-400"
+                              : "text-zinc-400"
+                        }`}
+                      >
+                        {typeof value === "number"
+                          ? value.toFixed(3)
+                          : "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
+                  <span className="text-xs text-zinc-500">
+                    Composite Score
+                  </span>
+                  <span className="font-mono text-sm font-semibold text-white">
+                    {typeof institutional?.iqtfDecision?.compositeScore ===
+                    "number"
+                      ? institutional.iqtfDecision.compositeScore.toFixed(3)
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Trade Setup */}
+              <div className="rounded-xl border border-white/10 bg-black/20 p-5 xl:col-span-4">
+                <div className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Trade Setup
+                </div>
+
+                {institutional?.tradeSetup?.available ? (
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {[
+                      ["Entry", institutional.tradeSetup.entry],
+                      ["Stop Loss", institutional.tradeSetup.stopLoss],
+                      ["TP1", institutional.tradeSetup.takeProfit1],
+                      ["TP2", institutional.tradeSetup.takeProfit2],
+                      ["TP3", institutional.tradeSetup.takeProfit3],
+                      ["R:R TP1", institutional.tradeSetup.riskRewardTp1],
+                    ].map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="rounded-lg border border-white/10 bg-white/[0.02] p-3"
+                      >
+                        <div className="text-xs text-zinc-500">{label}</div>
+                        <div className="mt-1 font-mono text-sm font-semibold text-white">
+                          {typeof value === "number"
+                            ? label === "R:R TP1"
+                              ? `${value.toFixed(2)}R`
+                              : formatPrice(value)
+                            : "—"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.04] p-4">
+                    <div className="text-sm font-semibold text-red-400">
+                      Trade Setup Unavailable
+                    </div>
+                    <div className="mt-1 text-xs text-zinc-500">
+                      {institutional?.tradeSetup?.reason ??
+                        institutional?.iqtfDecision?.tradePermissionReason ??
+                        institutional?.iqtfDecision?.reasons?.[0] ??
+                        "No valid trade setup"}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Executive Explanation */}
+            {(institutional?.iqtfDecision?.reasons?.length ||
+              institutional?.iqtfDecision?.warnings?.length) ? (
+              <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Executive Explanation
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {institutional.iqtfDecision.reasons?.slice(0, 3).map(
+                    (reason, index) => (
+                      <div
+                        key={`reason-${index}`}
+                        className="text-sm text-zinc-300"
+                      >
+                        • {reason}
+                      </div>
+                    ),
+                  )}
+
+                  {institutional.iqtfDecision.warnings?.slice(0, 2).map(
+                    (warning, index) => (
+                      <div
+                        key={`warning-${index}`}
+                        className="text-sm text-amber-400"
+                      >
+                        ⚠ {warning}
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
 
         {/* Decision Quality */}
         <div className="grid gap-4 lg:grid-cols-3">
