@@ -727,7 +727,7 @@ export default function Home() {
 
                   <span
                     className={`h-2.5 w-2.5 rounded-full ${
-                      value === "online" ||
+                      value === "online" || value === "healthy" ||
                       value === "enabled"
                         ? "bg-emerald-400"
                         : "bg-red-400"
