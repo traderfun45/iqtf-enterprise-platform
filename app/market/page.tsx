@@ -92,6 +92,13 @@ export default function MarketPage() {
           "[Market] Snapshot load failed:",
           snapshotErr
         )
+        setError(
+          `Market snapshot failed: ${
+            snapshotErr instanceof Error
+              ? snapshotErr.message
+              : String(snapshotErr)
+          }`
+        )
       }
 
       // ============================================================
@@ -108,6 +115,13 @@ export default function MarketPage() {
           "[Market] Intelligence load failed:",
           intelligenceErr
         )
+        setError(
+          `Market intelligence failed: ${
+            intelligenceErr instanceof Error
+              ? intelligenceErr.message
+              : String(intelligenceErr)
+          }`
+        )
       }
 
       // ============================================================
@@ -123,6 +137,13 @@ export default function MarketPage() {
         console.error(
           "[Market] Institutional analysis load failed:",
           institutionalErr
+        )
+        setError(
+          `Institutional analysis failed: ${
+            institutionalErr instanceof Error
+              ? institutionalErr.message
+              : String(institutionalErr)
+          }`
         )
       }
 
@@ -219,7 +240,7 @@ export default function MarketPage() {
               </div>
 
               <p className="mt-1 text-xs text-zinc-500">
-                Make sure iqtf-enterprise API is running on port 4000.
+                API: Cloudflare Workers
               </p>
             </CardContent>
           </Card>
