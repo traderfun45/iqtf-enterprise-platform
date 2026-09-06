@@ -50,6 +50,8 @@ jobs:
       - name: Deploy Cloudflare Dashboard
         run: npm run deploy
         env:
+          NEXT_PUBLIC_API_URL: https://iqtf-enterprise-api.traderfun45.workers.dev
+        env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
