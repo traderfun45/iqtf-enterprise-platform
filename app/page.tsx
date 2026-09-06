@@ -164,6 +164,19 @@ export default function Home() {
           intelligenceError,
         )
       }
+
+      try {
+        const institutionalData =
+          await getInstitutionalAnalysis("GC")
+
+        setInstitutional(institutionalData)
+      } catch (institutionalError) {
+        console.error(
+          "Institutional analysis refresh failed:",
+          institutionalError,
+        )
+        setInstitutional(null)
+      }
     } catch (err) {
       setError(
         err instanceof Error
