@@ -7,6 +7,7 @@ import { getMarketProvider } from './market/provider.js'
 import { calculateMarketIntelligence } from './services/market/intelligence.js'
 import { analyzeCmeIntelligence } from './services/cmeIntelligence.js'
 import { analyzeVol2Vol } from './services/vol2vol.js'
+import { analyzeCotIntelligence } from './services/cotIntelligence.js'
 import { resolveVol2VolState } from './services/vol2volState.js'
 import { buildHistoricalChanges } from './services/institutional.js'
 import { calculateIqtfDecision } from './services/iqtfDecision.js'
@@ -1517,7 +1518,7 @@ if (
         return json({
           success: true,
           symbol,
-          data: latest,
+          data: { id: Number(latest.id), symbol: String(latest.symbol), dataDate: String(latest.data_date), dataTime: latest.data_time == null ? "" : String(latest.data_time), settlementPrice: Number(latest.settlement_price), volume: latest.volume == null ? undefined : Number(latest.volume), volumeZscore: latest.volume_zscore == null ? undefined : Number(latest.volume_zscore), openInterest: latest.open_interest == null ? undefined : Number(latest.open_interest), oiChange: latest.oi_change == null ? undefined : Number(latest.oi_change), oiZscore: latest.oi_zscore == null ? undefined : Number(latest.oi_zscore), source: String(latest.source), inputMethod: String(latest.input_method ?? "MANUAL") },
           marketIntelligence,
           intelligence,
           vol2vol,
