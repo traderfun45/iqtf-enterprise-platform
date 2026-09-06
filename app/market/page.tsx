@@ -703,6 +703,47 @@ export default function MarketPage() {
               </div>
             </div>
 
+            {/* IQTF Permission / Conflict */}
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Trade Permission
+                </div>
+                <div
+                  className={
+                    institutional?.iqtfDecision?.tradePermission === "ALLOWED"
+                      ? "mt-2 text-lg font-semibold text-emerald-400"
+                      : "mt-2 text-lg font-semibold text-red-400"
+                  }
+                >
+                  {institutional?.iqtfDecision?.tradePermission ?? "—"}
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  {institutional?.iqtfDecision?.tradePermissionReason ?? "—"}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs text-zinc-500">
+                  Signal Conflict
+                </div>
+                <div
+                  className={
+                    institutional?.iqtfDecision?.signalConflict
+                      ? "mt-2 text-lg font-semibold text-amber-400"
+                      : "mt-2 text-lg font-semibold text-emerald-400"
+                  }
+                >
+                  {institutional?.iqtfDecision?.signalConflict
+                    ? "CONFLICT"
+                    : "ALIGNED"}
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  Market · CME · Vol2Vol · COT
+                </div>
+              </div>
+            </div>
+
             {/* Component Scores */}
             <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
               <div className="mb-3 text-xs text-zinc-500">
