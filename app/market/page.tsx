@@ -618,22 +618,22 @@ export default function MarketPage() {
 
                 <div
                   className={
-                    institutional?.summary.decision === "LONG" ||
-                    institutional?.summary.decision === "LONG_WATCH"
+                    institutional?.iqtfDecision?.decision === "LONG" ||
+                    institutional?.iqtfDecision?.decision === "LONG_WATCH"
                       ? "mt-3 text-2xl font-bold text-emerald-400"
-                      : institutional?.summary.decision === "SHORT" ||
-                          institutional?.summary.decision === "SHORT_WATCH"
+                      : institutional?.iqtfDecision?.decision === "SHORT" ||
+                          institutional?.iqtfDecision?.decision === "SHORT_WATCH"
                         ? "mt-3 text-2xl font-bold text-red-400"
                         : "mt-3 text-2xl font-bold text-zinc-300"
                   }
                 >
-                  {institutional?.summary.decision ?? "—"}
+                  {institutional?.iqtfDecision?.decision ?? "—"}
                 </div>
 
                 <div className="mt-2 text-xs text-zinc-500">
                   Composite Score{" "}
                   {institutional
-                    ? institutional.summary.compositeScore.toFixed(3)
+                    ? institutional.iqtfDecision.compositeScore.toFixed(3)
                     : "—"}
                 </div>
               </div>
@@ -646,14 +646,14 @@ export default function MarketPage() {
 
                 <div className="mt-3 text-2xl font-bold text-white">
                   {institutional
-                    ? `${institutional.summary.confidence.toFixed(0)}%`
+                    ? `${institutional.iqtfDecision.confidence.toFixed(0)}%`
                     : "—"}
                 </div>
 
                 <div className="mt-2 text-xs text-zinc-500">
                   Risk State{" "}
                   <span className="text-zinc-300">
-                    {institutional?.summary.riskState ?? "—"}
+                    {institutional?.iqtfDecision?.riskState ?? "—"}
                   </span>
                 </div>
               </div>
@@ -671,12 +671,12 @@ export default function MarketPage() {
                 <div className="mt-2 text-xs text-zinc-500">
                   CME{" "}
                   {institutional
-                    ? institutional.summary.components.cme.toFixed(3)
+                    ? institutional.iqtfDecision.components.cme.toFixed(3)
                     : "—"}
                   {" · "}
                   Vol2Vol{" "}
                   {institutional
-                    ? institutional.summary.components.vol2vol.toFixed(3)
+                    ? institutional.iqtfDecision.components.vol2vol.toFixed(3)
                     : "—"}
                 </div>
               </div>
@@ -716,7 +716,7 @@ export default function MarketPage() {
                   </div>
                   <div className="mt-1 text-sm font-semibold text-white">
                     {institutional
-                      ? institutional.summary.components.market.toFixed(3)
+                      ? institutional.iqtfDecision.components.market.toFixed(3)
                       : "—"}
                   </div>
                 </div>
@@ -727,7 +727,7 @@ export default function MarketPage() {
                   </div>
                   <div className="mt-1 text-sm font-semibold text-white">
                     {institutional
-                      ? institutional.summary.components.cme.toFixed(3)
+                      ? institutional.iqtfDecision.components.cme.toFixed(3)
                       : "—"}
                   </div>
                 </div>
@@ -738,7 +738,7 @@ export default function MarketPage() {
                   </div>
                   <div className="mt-1 text-sm font-semibold text-white">
                     {institutional
-                      ? institutional.summary.components.vol2vol.toFixed(3)
+                      ? institutional.iqtfDecision.components.vol2vol.toFixed(3)
                       : "—"}
                   </div>
                 </div>
@@ -749,7 +749,7 @@ export default function MarketPage() {
                   </div>
                   <div className="mt-1 text-sm font-semibold text-white">
                     {institutional
-                      ? institutional.summary.components.cot.toFixed(3)
+                      ? institutional.iqtfDecision.components.cot.toFixed(3)
                       : "—"}
                   </div>
                 </div>
@@ -765,8 +765,8 @@ export default function MarketPage() {
                 </div>
 
                 <div className="mt-3 space-y-2">
-                  {institutional?.summary.reasons?.length ? (
-                    institutional.summary.reasons.map((reason, index) => (
+                  {institutional?.iqtfDecision?.reasons?.length ? (
+                    institutional.iqtfDecision.reasons.map((reason, index) => (
                       <div
                         key={`reason-${index}`}
                         className="text-sm text-zinc-300"
@@ -788,8 +788,8 @@ export default function MarketPage() {
                 </div>
 
                 <div className="mt-3 space-y-2">
-                  {institutional?.summary.warnings?.length ? (
-                    institutional.summary.warnings.map((warning, index) => (
+                  {institutional?.iqtfDecision?.warnings?.length ? (
+                    institutional.iqtfDecision.warnings.map((warning, index) => (
                       <div
                         key={`warning-${index}`}
                         className="text-sm text-amber-400"
