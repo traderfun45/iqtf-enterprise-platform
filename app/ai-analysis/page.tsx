@@ -1344,7 +1344,7 @@ const iqtf = institutionalData?.iqtfDecision ?? null
 
 
         <p className={`mt-2 text-xl font-bold ${decisionColor}`}>
-          {iqtf?.decision ?? decision.action}
+          {iqtf?.riskState ?? "—"}
            </p>
           </div>
 
