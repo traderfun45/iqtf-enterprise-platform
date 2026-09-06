@@ -2746,7 +2746,7 @@ if (
       marketAlignment,
       institutionalAlignment,
       institutionalScore,
-      signalConflict,
+      signalConflict: iqtfDecision.signalConflict,
       components: iqtfDecision.components,
       reasons: iqtfDecision.reasons,
       warnings: iqtfDecision.warnings,
