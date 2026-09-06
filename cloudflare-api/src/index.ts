@@ -5,6 +5,12 @@ import { verifyPassword } from './services/password.js'
 import { listMarkets, getMarketBySymbol } from './market/markets.js'
 import { getMarketProvider } from './market/provider.js'
 import { calculateMarketIntelligence } from './services/market/intelligence.js'
+import { analyzeCmeIntelligence } from './services/cmeIntelligence.js'
+import { analyzeVol2Vol } from './services/vol2vol.js'
+import { resolveVol2VolState } from './services/vol2volState.js'
+import { buildHistoricalChanges } from './services/institutional.js'
+import { calculateIqtfDecision } from './services/iqtfDecision.js'
+import { getVol2VolState, saveVol2VolState } from './db/vol2volState.js'
 
 export interface Env {
   DB: D1Database
@@ -1395,6 +1401,142 @@ if (
           },
           500,
         )
+      }
+    }
+
+
+    // =========================================================
+    // GET /api/cme/analysis
+    // =========================================================
+    if (
+      url.pathname === '/api/cme/analysis' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const symbol = (url.searchParams.get('symbol') || 'GC').toUpperCase()
+
+        const result = await env.DB.prepare(`
+          SELECT id, symbol, data_date, data_time,
+                 settlement_price, volume, open_interest,
+                 oi_change, volume_zscore, oi_zscore,
+                 source, note, created_at, updated_at,
+                 created_by, input_method, image_reference
+          FROM cme_market_data
+          WHERE symbol = ?
+          ORDER BY data_date DESC, data_time DESC, id DESC
+          LIMIT 100
+        `).bind(symbol).all()
+
+        const rows = result.results as Array<Record<string, unknown>>
+        const latest = rows[0]
+        const previous = rows[1]
+
+        if (!latest || latest.settlement_price == null) {
+          return json({ error: 'No CME market data available' }, 404)
+        }
+
+        const history = rows.map((row) => ({
+          volume: row.volume == null ? undefined : Number(row.volume),
+          openInterest: row.open_interest == null ? undefined : Number(row.open_interest),
+        }))
+
+        const { historicalVolumeChanges, historicalOIChanges } =
+          buildHistoricalChanges(history)
+
+        const intelligence = analyzeCmeIntelligence({
+          price: Number(latest.settlement_price),
+          previousPrice: previous?.settlement_price == null ? undefined : Number(previous.settlement_price),
+          volume: latest.volume == null ? undefined : Number(latest.volume),
+          previousVolume: previous?.volume == null ? undefined : Number(previous.volume),
+          openInterest: latest.open_interest == null ? undefined : Number(latest.open_interest),
+          previousOpenInterest: previous?.open_interest == null ? undefined : Number(previous.open_interest),
+          historicalVolumeChanges,
+          historicalOIChanges,
+        })
+
+        const vol2vol = analyzeVol2Vol({
+          priceChange: intelligence.priceChange,
+          volumeChange: intelligence.volumeChange,
+          openInterestChange: intelligence.openInterestChange,
+          volumeZscore: intelligence.volumeZscore,
+          oiZscore: intelligence.oiZscore,
+          positioning: intelligence.positioning,
+        })
+
+        const storedState = await getVol2VolState(env.DB, symbol)
+
+        const vol2volState = resolveVol2VolState({
+          previousState: storedState.state as 'NO_POSITION' | 'LONG_ACTIVE' | 'SHORT_ACTIVE',
+          signal: vol2vol.signal,
+          confidence: vol2vol.confidence,
+        })
+
+        const market = await getMarketBySymbol(env.DB, symbol)
+
+        if (!market) {
+          return json({ error: `Market symbol not found: ${symbol}` }, 404)
+        }
+
+        const provider = getMarketProvider(market.provider, env)
+
+        if (typeof provider.getHistory !== 'function') {
+          return json({ error: `Historical data is not supported for ${symbol}` }, 501)
+        }
+
+        const candles = await provider.getHistory(symbol, {
+          interval: '1h',
+          outputsize: 50,
+        })
+
+        if (!candles.length) {
+          return json({ error: `No market history available for ${symbol}` }, 404)
+        }
+
+        const marketIntelligence = calculateMarketIntelligence(candles)
+
+        const iqtfDecision = calculateIqtfDecision({
+          marketScore: marketIntelligence.score,
+          cmeConfirmation: intelligence.confirmationScore,
+          vol2volScore: vol2vol.score,
+          marketSignal: marketIntelligence.signal,
+          marketStructure: marketIntelligence.structure.direction,
+          volatilityRegime: marketIntelligence.volatilityRegime.regime,
+          cmePositioning: intelligence.positioning,
+          cmeOiConfirmation: intelligence.oiConfirmation,
+          vol2volSignal: vol2vol.signal,
+        })
+
+        const savedState = await saveVol2VolState(env.DB, {
+          symbol,
+          state: vol2volState.state,
+          signal: vol2volState.signal,
+          confidence: vol2volState.confidence,
+          action: vol2volState.action,
+        })
+
+        return json({
+          success: true,
+          symbol,
+          data: latest,
+          marketIntelligence,
+          intelligence,
+          vol2vol,
+          iqtfDecision,
+          vol2volState: savedState,
+          previousState: storedState.state,
+          historyStats: {
+            records: rows.length,
+            volumeChangeSamples: historicalVolumeChanges.length,
+            oiChangeSamples: historicalOIChanges.length,
+          },
+        })
+      } catch (error) {
+        console.error('GET /api/cme/analysis error:', error)
+        return json({
+          success: false,
+          error: 'Failed to analyze CME data',
+          message: error instanceof Error ? error.message : String(error),
+        }, 500)
       }
     }
 
