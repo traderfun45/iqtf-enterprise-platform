@@ -137,6 +137,29 @@ export type CmeAnalysis = {
     reasons: string[]
   }
 
+  tradeSetup: {
+    available: boolean
+    decision:
+      | "LONG"
+      | "LONG_WATCH"
+      | "NO_TRADE"
+      | "SHORT_WATCH"
+      | "SHORT"
+    entry: number | null
+    stopLoss: number | null
+    takeProfit1: number | null
+    takeProfit2: number | null
+    takeProfit3: number | null
+    riskAmount: number | null
+    rewardToTp1: number | null
+    rewardToTp2: number | null
+    rewardToTp3: number | null
+    riskRewardTp1: number | null
+    riskRewardTp2: number | null
+    riskRewardTp3: number | null
+    reason?: string
+  }
+
   iqtfDecision: {
     compositeScore: number
     decision:
@@ -147,6 +170,9 @@ export type CmeAnalysis = {
       | "SHORT"
     confidence: number
     riskState: "LOW" | "NORMAL" | "ELEVATED" | "HIGH"
+    signalConflict?: boolean
+    tradePermission?: "ALLOWED" | "BLOCKED"
+    tradePermissionReason?: string
     components: {
       market: number
       cme: number
@@ -262,6 +288,9 @@ export type InstitutionalAnalysis = {
       | "SHORT"
     confidence: number
     riskState: "LOW" | "NORMAL" | "ELEVATED" | "HIGH"
+    signalConflict?: boolean
+    tradePermission?: "ALLOWED" | "BLOCKED"
+    tradePermissionReason?: string
     components: {
       market: number
       cme: number
@@ -270,6 +299,29 @@ export type InstitutionalAnalysis = {
     }
     reasons: string[]
     warnings: string[]
+  }
+
+  tradeSetup: {
+    available: boolean
+    decision:
+      | "LONG"
+      | "LONG_WATCH"
+      | "NO_TRADE"
+      | "SHORT_WATCH"
+      | "SHORT"
+    entry: number | null
+    stopLoss: number | null
+    takeProfit1: number | null
+    takeProfit2: number | null
+    takeProfit3: number | null
+    riskAmount: number | null
+    rewardToTp1: number | null
+    rewardToTp2: number | null
+    rewardToTp3: number | null
+    riskRewardTp1: number | null
+    riskRewardTp2: number | null
+    riskRewardTp3: number | null
+    reason?: string
   }
 
   summary: {

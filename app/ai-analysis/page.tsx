@@ -36,7 +36,7 @@ function formatPercent(value: number) {
 
 function getDecision(
   data: Intelligence | null,
-  cmeData: CmeAnalysis | null
+  institutionalData: InstitutionalAnalysis | null
 ): IntelligenceDecision {
   if (!data) {
     return {
@@ -67,7 +67,7 @@ function getDecision(
     }
   }
 
-  const backend = cmeData?.iqtfDecision
+  const backend = institutionalData?.iqtfDecision
 
   if (backend) {
     const bias =
@@ -204,71 +204,85 @@ function getRiskPositionContext(
 }
 
 function getTradePlan(
-  data: Intelligence | null,
-  decision: ReturnType<typeof getDecision>,
-  riskPosition: ReturnType<typeof getRiskPositionContext>
+  institutionalData: InstitutionalAnalysis | null
 ) {
-  if (!data) {
+  const setup = institutionalData?.tradeSetup
+  const iqtfDecision = institutionalData?.iqtfDecision
+
+  if (!setup) {
     return {
       setup: "WAIT",
       direction: "NEUTRAL",
-      trigger: "WAIT FOR LIVE DATA",
-      invalidation: "—",
+      trigger:
+        iqtfDecision?.tradePermissionReason ??
+        iqtfDecision?.reasons?.[0] ??
+        "WAIT FOR LIVE DATA",
+      invalidation: "LIVE DATA REQUIRED",
       target: "—",
       riskReward: "—",
       planStatus: "NOT READY",
     }
   }
 
-  const atr = data.volatility.atr
+  const direction =
+    setup.decision === "LONG"
+      ? "LONG"
+      : setup.decision === "SHORT"
+        ? "SHORT"
+        : "NEUTRAL"
 
-  let setup = "WAIT"
-  let direction = "NEUTRAL"
-  let trigger = "Require directional confirmation"
-  let invalidation = `ATR protection · ${atr.toFixed(2)}`
-  let target = `Monitor ≥ 1.5 ATR · ${(atr * 1.5).toFixed(2)}`
-  let riskReward = "1 : 1.5"
-  let planStatus = "CONFIRMATION REQUIRED"
+  const setupLabel =
+    setup.available && direction === "LONG"
+      ? "LONG SETUP"
+      : setup.available && direction === "SHORT"
+        ? "SHORT SETUP"
+        : "WAIT"
 
-  if (
-    decision.action === "LONG WATCH" &&
-    riskPosition.readiness === "CONFIRMED"
-  ) {
-    setup = "LONG SETUP"
-    direction = "LONG"
-    trigger = "Bullish confirmation above active structure"
-    invalidation = `Below risk boundary · ~${atr.toFixed(2)} ATR`
-    target = `Initial objective · ~${(atr * 1.5).toFixed(2)}`
-    riskReward = "1 : 1.5"
-    planStatus = "READY"
-  } else if (
-    decision.action === "SHORT WATCH" &&
-    riskPosition.readiness === "CONFIRMED"
-  ) {
-    setup = "SHORT SETUP"
-    direction = "SHORT"
-    trigger = "Bearish confirmation below active structure"
-    invalidation = `Above risk boundary · ~${atr.toFixed(2)} ATR`
-    target = `Initial objective · ~${(atr * 1.5).toFixed(2)}`
-    riskReward = "1 : 1.5"
-    planStatus = "READY"
-  }
+  const trigger =
+    setup.available && setup.entry !== null
+      ? `Entry reference · ${setup.entry}`
+      : setup.reason ?? "Wait for additional confirmation"
 
-  if (data.volatility.atrPercent >= 0.5) {
-    planStatus = "HIGH RISK · WAIT"
-    setup = "WAIT"
-    direction = "NEUTRAL"
-    trigger = "Wait for volatility normalization"
-  }
+  const invalidation =
+    setup.available && setup.stopLoss !== null
+      ? `Stop loss · ${setup.stopLoss}`
+      : setup.reason ?? "No active trade setup"
+
+  const target =
+    setup.available && setup.takeProfit1 !== null
+      ? `TP1 · ${setup.takeProfit1}`
+      : "—"
+
+  const riskReward =
+    setup.available && setup.riskRewardTp1 !== null
+      ? `1 : ${setup.riskRewardTp1.toFixed(2)}`
+      : "—"
+
+  const planStatus =
+    setup.available && (direction === "LONG" || direction === "SHORT")
+      ? "READY"
+      : "CONFIRMATION REQUIRED"
 
   return {
-    setup,
+    setup: setupLabel,
     direction,
     trigger,
     invalidation,
     target,
     riskReward,
     planStatus,
+    entry: setup.entry,
+    stopLoss: setup.stopLoss,
+    takeProfit1: setup.takeProfit1,
+    takeProfit2: setup.takeProfit2,
+    takeProfit3: setup.takeProfit3,
+    riskAmount: setup.riskAmount,
+    rewardToTp1: setup.rewardToTp1,
+    rewardToTp2: setup.rewardToTp2,
+    rewardToTp3: setup.rewardToTp3,
+    riskRewardTp1: setup.riskRewardTp1,
+    riskRewardTp2: setup.riskRewardTp2,
+    riskRewardTp3: setup.riskRewardTp3,
   }
 }
 
@@ -862,9 +876,9 @@ const [
       ? "bg-red-500/10"
       : "bg-zinc-500/10"
 
-  const decision = getDecision(data, cmeData)
+  const decision = getDecision(data, institutionalData)
 
-const iqtf = cmeData?.iqtfDecision ?? null
+const iqtf = institutionalData?.iqtfDecision ?? null
 
 
   const decisionColor =
@@ -893,9 +907,7 @@ const iqtf = cmeData?.iqtfDecision ?? null
         : "text-zinc-300"
 
   const tradePlan = getTradePlan(
-    data,
-    decision,
-    riskPosition
+    institutionalData
   )
 
   const tradePlanColor =
@@ -1562,6 +1574,78 @@ const iqtf = cmeData?.iqtfDecision ?? null
             </p>
           </div>
         </div>
+
+        {tradePlan.entry !== null ? (
+          <>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+              {[
+                ["Entry", tradePlan.entry],
+                ["Stop Loss", tradePlan.stopLoss],
+                ["TP1", tradePlan.takeProfit1],
+                ["TP2", tradePlan.takeProfit2],
+                ["TP3", tradePlan.takeProfit3],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-lg border border-white/5 bg-white/[0.02] p-4"
+                >
+                  <p className="text-xs text-zinc-500">
+                    {label}
+                  </p>
+                  <p className="mt-2 text-lg font-bold text-white">
+                    {typeof value === "number" ? value.toFixed(2) : "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              {[
+                ["TP1 R:R", tradePlan.riskRewardTp1],
+                ["TP2 R:R", tradePlan.riskRewardTp2],
+                ["TP3 R:R", tradePlan.riskRewardTp3],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-lg border border-white/5 bg-white/[0.02] p-3"
+                >
+                  <p className="text-xs text-zinc-500">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-zinc-300">
+                    {typeof value === "number"
+                      ? `1 : ${value.toFixed(2)}`
+                      : "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/[0.03] p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-red-400">
+                  Trade Setup Unavailable
+                </p>
+                <p className="mt-1 text-sm font-semibold text-white">
+                  NO TRADE
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  No Entry / Stop Loss / Take Profit levels are active.
+                </p>
+              </div>
+
+              <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-400">
+                BLOCKED
+              </span>
+            </div>
+
+            <p className="mt-3 text-xs text-zinc-400">
+              {tradePlan.trigger}
+            </p>
+          </div>
+        )}
 
         {/* CME + Institutional Flow */}
         <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/[0.03] p-5">
