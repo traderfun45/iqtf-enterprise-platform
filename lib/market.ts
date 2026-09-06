@@ -364,11 +364,26 @@ export async function getInstitutionalAnalysis(
     10000
   )
 }
+type MarketQuoteResponse = {
+  success: boolean
+  market: {
+    id: number
+    symbol: string
+    name: string
+    provider: string
+    created_at: string
+    updated_at: string
+  }
+  quote: Quote
+}
+
 export async function getMarketQuote(
   symbol = "XAUUSD"
 ): Promise<Quote> {
-  return apiGet<Quote>(
+  const response = await apiGet<MarketQuoteResponse>(
     `/api/market/quote?symbol=${encodeURIComponent(symbol)}`,
     10000
   )
+
+  return response.quote
 }
