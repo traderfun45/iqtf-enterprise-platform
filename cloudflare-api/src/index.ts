@@ -2517,6 +2517,286 @@ if (
     }
 
     // =========================================================
+/* INSTITUTIONAL_ROUTE_START */
+if (
+  url.pathname === '/api/institutional/analysis' &&
+  request.method === 'GET'
+) {
+  try {
+    const symbol = url.searchParams.get('symbol') || 'GC'
+
+    const cmeResult = await env.DB.prepare(`
+      SELECT *
+      FROM cme_market_data
+      WHERE symbol = ?
+      ORDER BY data_date DESC, id DESC
+      LIMIT 100
+    `).bind(symbol).all()
+
+    const cmeRows = cmeResult.results as any[]
+
+    if (cmeRows.length === 0) {
+      return json({
+        success: false,
+        symbol,
+        error: 'No CME data available',
+      }, 404)
+    }
+
+    const latest = cmeRows[0]
+    const previous = cmeRows[1] ?? null
+
+    const cmeHistory = cmeRows.map((row) => ({
+      id: Number(row.id),
+      symbol: String(row.symbol),
+      dataDate: String(row.data_date),
+      dataTime: row.data_time == null ? '' : String(row.data_time),
+      settlementPrice: Number(row.settlement_price),
+      volume: row.volume == null ? undefined : Number(row.volume),
+      volumeZscore: row.volume_zscore == null ? undefined : Number(row.volume_zscore),
+      openInterest: row.open_interest == null ? undefined : Number(row.open_interest),
+      oiChange: row.oi_change == null ? undefined : Number(row.oi_change),
+      oiZscore: row.oi_zscore == null ? undefined : Number(row.oi_zscore),
+      source: String(row.source ?? 'CME'),
+      inputMethod: String(row.input_method ?? 'MANUAL'),
+    }))
+
+    const latestPrice = Number(latest.settlement_price ?? 0)
+    const previousPrice = previous
+      ? Number(previous.settlement_price ?? latestPrice)
+      : latestPrice
+    const latestVolume = Number(latest.volume ?? 0)
+    const previousVolume = previous
+      ? Number(previous.volume ?? latestVolume)
+      : latestVolume
+    const latestOi = Number(latest.open_interest ?? 0)
+    const previousOi = previous
+      ? Number(previous.open_interest ?? latestOi)
+      : latestOi
+
+    const cme = analyzeCmeIntelligence({
+      price: latestPrice,
+      previousPrice,
+      volume: latestVolume,
+      previousVolume,
+      openInterest: latestOi,
+      previousOpenInterest: previousOi,
+      historicalVolumeChanges: cmeRows
+        .slice(0, -1)
+        .map((row, i) => Number(row.volume ?? 0) - Number(cmeRows[i + 1]?.volume ?? 0)),
+      historicalOIChanges: cmeRows
+        .slice(0, -1)
+        .map((row, i) => Number(row.open_interest ?? 0) - Number(cmeRows[i + 1]?.open_interest ?? 0)),
+    })
+
+    const vol2vol = analyzeVol2Vol({
+      priceChange: latestPrice - previousPrice,
+      volumeChange: latestVolume - previousVolume,
+      openInterestChange: latestOi - previousOi,
+      volumeZscore: Number(latest.volume_zscore ?? 0),
+      oiZscore: Number(latest.oi_zscore ?? 0),
+      positioning: cme.positioning,
+    })
+
+    const market = await getMarketBySymbol(env.DB, symbol)
+
+    if (!market) {
+      return json({
+        success: false,
+        symbol,
+        error: `Market not found: ${symbol}`,
+      }, 404)
+    }
+
+    const provider = getMarketProvider(
+      market.provider,
+      env,
+    )
+
+    if (!provider.getHistory) {
+      return json({
+        success: false,
+        symbol,
+        error: 'Market history provider unavailable',
+      }, 500)
+    }
+
+    const marketHistory = await provider.getHistory(
+      market.symbol,
+      { interval: '1h', outputsize: 50 },
+    )
+
+    const marketIntelligence = calculateMarketIntelligence(
+      marketHistory,
+    )
+
+    const cotResult = await env.DB.prepare(`
+      SELECT *
+      FROM cot_market_data
+      WHERE symbol = ?
+      ORDER BY report_date DESC, id DESC
+      LIMIT 2
+    `).bind(symbol).all()
+
+    const cotRows = cotResult.results as any[]
+
+    let cot: any
+
+    if (cotRows.length === 0) {
+      cot = {
+        intelligence: {
+          managedMoneyNet: 0,
+          producerNet: 0,
+          swapDealerNet: 0,
+          otherReportablesNet: 0,
+          managedMoneyNetChange: 0,
+          producerNetChange: 0,
+          swapDealerNetChange: 0,
+          otherReportablesNetChange: 0,
+          positioning: 'NEUTRAL',
+          confidence: 'LOW',
+          score: 0,
+          reasons: ['No COT data available'],
+        },
+        latest: {
+          id: 0,
+          symbol,
+          reportDate: '',
+          openInterest: 0,
+          producerLong: 0,
+          producerShort: 0,
+          swapDealerLong: 0,
+          swapDealerShort: 0,
+          managedMoneyLong: 0,
+          managedMoneyShort: 0,
+          otherReportablesLong: 0,
+          otherReportablesShort: 0,
+          source: 'NONE',
+        },
+      }
+    } else {
+      const mapCot = (row: any) => ({
+        id: Number(row.id),
+        symbol: String(row.symbol),
+        reportDate: String(row.report_date),
+        openInterest: Number(row.open_interest ?? 0),
+        producerLong: Number(row.producer_long ?? 0),
+        producerShort: Number(row.producer_short ?? 0),
+        swapDealerLong: Number(row.swap_dealer_long ?? 0),
+        swapDealerShort: Number(row.swap_dealer_short ?? 0),
+        managedMoneyLong: Number(row.managed_money_long ?? 0),
+        managedMoneyShort: Number(row.managed_money_short ?? 0),
+        otherReportablesLong: Number(row.other_reportables_long ?? 0),
+        otherReportablesShort: Number(row.other_reportables_short ?? 0),
+        source: String(row.source ?? 'COT'),
+        note: row.note == null ? undefined : String(row.note),
+      })
+
+      const cotLatest = mapCot(cotRows[0])
+      const cotPrevious = cotRows[1] ? mapCot(cotRows[1]) : undefined
+
+      cot = {
+        intelligence: analyzeCotIntelligence({
+          latest: cotLatest,
+          previous: cotPrevious,
+        }),
+        latest: cotLatest,
+        previous: cotPrevious,
+      }
+    }
+
+    const iqtfDecision = calculateIqtfDecision({
+      marketScore: Number(marketIntelligence.score ?? 0),
+      cmeConfirmation: Number(cme.confirmationScore ?? 0),
+      vol2volScore: Number(vol2vol.score ?? 0),
+      cotScore: Number(cot.intelligence.score ?? 0),
+    })
+
+    const institutionalScore =
+      Number(cme.confirmationScore ?? 0) * 0.25 +
+      (Number(vol2vol.score ?? 0) / 100) * 0.25 +
+      (Number(cot.intelligence.score ?? 0) / 3) * 0.15
+
+    const marketScore = Number(marketIntelligence.score ?? 0)
+
+    const marketAlignment =
+      marketScore > 0.25
+        ? 'BULLISH'
+        : marketScore < -0.25
+          ? 'BEARISH'
+          : 'NEUTRAL'
+
+    const institutionalAlignment =
+      institutionalScore > 0.25
+        ? 'BULLISH'
+        : institutionalScore < -0.25
+          ? 'BEARISH'
+          : 'NEUTRAL'
+
+    const signalConflict =
+      marketAlignment !== 'NEUTRAL' &&
+      institutionalAlignment !== 'NEUTRAL' &&
+      marketAlignment !== institutionalAlignment
+
+    const summary = {
+      decision: iqtfDecision.decision,
+      confidence: iqtfDecision.confidence,
+      riskState: iqtfDecision.riskState,
+      compositeScore: iqtfDecision.compositeScore,
+      marketAlignment,
+      institutionalAlignment,
+      institutionalScore,
+      signalConflict,
+      components: iqtfDecision.components,
+      reasons: iqtfDecision.reasons,
+      warnings: iqtfDecision.warnings,
+    }
+
+    return json({
+      success: true,
+      symbol,
+      cme,
+      vol2vol,
+      cot,
+      iqtfDecision,
+      summary,
+      historyStats: {
+        cmeRecords: cmeRows.length,
+        cotRecords: cotRows.length,
+        volumeChangeSamples: Math.max(0, cmeRows.length - 1),
+        oiChangeSamples: Math.max(0, cmeRows.length - 1),
+      },
+      marketIntelligence,
+      data: {
+        id: Number(latest.id),
+        symbol: String(latest.symbol),
+        dataDate: String(latest.data_date),
+        dataTime: latest.data_time == null ? '' : String(latest.data_time),
+        settlementPrice: Number(latest.settlement_price),
+        volume: latest.volume == null ? undefined : Number(latest.volume),
+        volumeZscore: latest.volume_zscore == null ? undefined : Number(latest.volume_zscore),
+        openInterest: latest.open_interest == null ? undefined : Number(latest.open_interest),
+        oiChange: latest.oi_change == null ? undefined : Number(latest.oi_change),
+        oiZscore: latest.oi_zscore == null ? undefined : Number(latest.oi_zscore),
+        source: String(latest.source ?? 'CME'),
+        inputMethod: String(latest.input_method ?? 'MANUAL'),
+      },
+    })
+  } catch (error) {
+    console.error(
+      'GET /api/institutional/analysis error:',
+      error,
+    )
+
+    return json({
+      success: false,
+      error: 'Failed to calculate institutional analysis',
+    }, 500)
+  }
+}
+/* INSTITUTIONAL_ROUTE_END */
+
+
     // 404
     // =========================================================
     return json(
