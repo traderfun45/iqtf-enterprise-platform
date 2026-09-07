@@ -172,6 +172,56 @@ export function parseCmeVol2Vol(
   }
 
   // ------------------------------------------------------------
+  // Intraday Volume view
+  //
+  // Example:
+  // Future Price: 4485
+  // Put: 2,682
+  // Call: 4,931
+  // Vol: 34.01
+  // Vol Chg: -0.20
+  // ------------------------------------------------------------
+
+  if (result.futureSettlement === undefined) {
+    const match = text.match(
+      /Future\s+Price\s*[:\-]\s*([\d,.]+)/i,
+    )
+
+    if (match) {
+      result.futureSettlement = parseDecimal(match[1])
+    }
+  }
+
+  if (result.putVolume === undefined) {
+    const match = text.match(
+      /\bPut\s*[:\-]\s*([\d,.]+)/i,
+    )
+
+    if (match) {
+      result.putVolume = parseCount(match[1])
+    }
+  }
+
+  if (result.callVolume === undefined) {
+    const match = text.match(
+      /\bCall\s*[:\-]\s*([\d,.]+)/i,
+    )
+
+    if (match) {
+      result.callVolume = parseCount(match[1])
+    }
+  }
+
+  if (result.volatilitySettlement === undefined) {
+    const match = text.match(
+      /\bVol\s*[:\-]\s*([\d,.]+)/i,
+    )
+
+    if (match) {
+      result.volatilitySettlement = parseDecimal(match[1])
+    }
+  }
+
   // Expected Range
   //
   // NVIDIA Vision may return Markdown:
