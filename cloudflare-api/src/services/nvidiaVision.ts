@@ -62,34 +62,85 @@ export async function analyzeCmeImageWithNvidia(
 
 Read the CME Gold / Vol2Vol screenshot.
 
-Do NOT describe the image.
-Do NOT explain the image.
-Do NOT summarize the image.
-Do NOT analyze the market.
-Do NOT calculate anything.
-Do NOT infer values that are not visible.
+Your ONLY task is to transcribe visible text and numbers from the screenshot.
 
-Your ONLY task is to transcribe visible text and numbers.
+DO NOT:
+- describe the image
+- explain the image
+- summarize the image
+- analyze the market
+- calculate any value
+- infer missing values
+- guess unreadable numbers
+- convert units
+- derive totals
+- calculate z-scores
 
-CRITICAL:
-- Read the actual table/chart labels and numeric values.
-- Preserve decimal points exactly.
-- Preserve commas in numbers when visible.
-- Preserve + and - signs exactly.
+CRITICAL OCR RULES:
+- Read the actual labels and the numeric value immediately associated with each label.
+- Preserve decimal points exactly as visible.
+- Preserve commas exactly as visible.
+- Preserve + and - signs exactly as visible.
 - Preserve labels exactly as shown.
-- Never convert +1, +2, +3 into 1SD, 2SD, 3SD.
-- Never convert 1SD into +1.
-- Never calculate missing values.
-- Never replace an unreadable value with a guessed value.
+- Do not confuse a label with a nearby number.
+- Do not use a number from another row or column.
+- If a label is visible but its value cannot be read confidently, report the label in unreadable_or_missing_information.
+- Never invent a value.
 
-PRIORITY FIELDS:
+PRIORITY 1 — VOL2VOL HEADER:
+Read these fields if visible:
 
 Future Stl
 Vol Stl
-Calls
 Puts
+Calls
 
-Expected Range:
+For each field, capture the number directly associated with that label.
+
+PRIORITY 2 — OPEN INTEREST:
+Carefully inspect every visible occurrence of:
+
+TOTAL OPEN INTEREST
+Total Open Interest
+OPEN INTEREST
+Open Interest
+OI
+Max OI
+
+If a numeric value is directly associated with one of these labels, transcribe BOTH the label and value into raw_text.
+
+IMPORTANT:
+- Do not assume Max OI is Total Open Interest.
+- Do not assume Calls + Puts equals Total Open Interest.
+- Do not calculate Total Open Interest.
+- If "TOTAL OPEN INTEREST" is visible but its number is not readable, report "TOTAL OPEN INTEREST" as unreadable_or_missing_information.
+
+PRIORITY 3 — VOLUME:
+Carefully inspect visible:
+
+Volume
+VOL
+Total Volume
+
+Transcribe the actual visible number associated with the label.
+
+Do not calculate volume from Calls and Puts.
+
+PRIORITY 4 — OI CHANGE:
+Carefully inspect visible:
+
+Change
+OI Change
+Open Interest Change
+Change in OI
+
+Transcribe the actual visible signed number associated with the label.
+
+Preserve negative and positive signs exactly.
+
+PRIORITY 5 — EXPECTED RANGE:
+
+Expected Range
 ATM
 +1
 +2
@@ -98,12 +149,14 @@ ATM
 -2
 -3
 
-Also transcribe visible:
+Never convert +1/+2/+3 into 1SD/2SD/3SD.
+Never convert 1SD/2SD/3SD into +1/+2/+3.
+
+PRIORITY 6 — OTHER VISIBLE DATA:
+
 Future
 Strike
 Volatility
-OI
-Change
 Upper
 Lower
 High
@@ -115,18 +168,25 @@ Low
 -2SD
 -3SD
 
+Read all relevant visible numeric values.
+
+OUTPUT RULES:
+
 Return ONLY this JSON object.
 No markdown.
 No explanation.
 
 {
   "screenshot_type": "CME Options / Vol2Vol",
-  "raw_text": "verbatim transcription of all relevant visible text and numbers",
+  "raw_text": "verbatim transcription of all relevant visible labels and numbers",
   "unreadable_or_missing_information": []
 }
 
-If something important is genuinely unreadable, put its label in unreadable_or_missing_information.
-Do not invent its value.
+The raw_text MUST contain the visible label together with its associated number whenever the number is readable.
+
+If a priority field is visible but its value is genuinely unreadable, put the field label in unreadable_or_missing_information.
+
+Do not calculate or infer any missing value.
 `,
             },
             {

@@ -3,6 +3,11 @@ export type CmeVol2VolParsed = {
   volatilitySettlement?: number
   putVolume?: number
   callVolume?: number
+  volume?: number
+  volumeZscore?: number
+  openInterest?: number
+  oiChange?: number
+  oiZscore?: number
 
 expectedRange?: {
   minus3?: number
