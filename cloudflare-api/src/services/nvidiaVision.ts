@@ -1,6 +1,8 @@
 export type NvidiaVisionResult = {
   screenshot_type: string
+  view_type: string
   raw_text: string
+  strike_levels: number[]
   unreadable_or_missing_information: string[]
 }
 
@@ -60,134 +62,179 @@ export async function analyzeCmeImageWithNvidia(
               type: 'text',
               text: `OCR TASK ONLY.
 
-Read the CME Gold / Vol2Vol screenshot.
+Read ONLY the visible text and numbers in this CME Gold Options / Vol2Vol screenshot.
 
-Your ONLY task is to transcribe visible text and numbers from the screenshot.
+IMPORTANT:
+This screenshot may show different CME views.
+FIRST identify which view is ACTIVE from the left-side menu.
+
+For an "Intraday Volume" view, focus on the visible header and price/strike axis.
+Do NOT reinterpret the screenshot as an Expected Range page.
 
 DO NOT:
 - describe the image
 - explain the image
 - summarize the image
 - analyze the market
-- calculate any value
+- calculate anything
+- add values that are not visibly printed
 - infer missing values
+- estimate bar heights
+- estimate chart values
 - guess unreadable numbers
-- convert units
 - derive totals
 - calculate z-scores
+- convert units
+- combine Put + Call into another value
+- invent Expected Range values
+- invent Open Interest values
 
-CRITICAL OCR RULES:
-- Read the actual labels and the numeric value immediately associated with each label.
+OCR ACCURACY RULES:
+- Transcribe only values actually visible in the screenshot.
 - Preserve decimal points exactly as visible.
 - Preserve commas exactly as visible.
 - Preserve + and - signs exactly as visible.
-- Preserve labels exactly as shown.
-- Do not confuse a label with a nearby number.
-- Do not use a number from another row or column.
-- If a label is visible but its value cannot be read confidently, report the label in unreadable_or_missing_information.
-- Never invent a value.
+- Keep the label next to its directly associated value.
+- Do not take a number from another row, column, axis, or chart.
+- If a decimal point is unclear, DO NOT guess it.
+- If a value cannot be read confidently, put the field label in unreadable_or_missing_information.
+- Never replace an unreadable value with a guessed value.
 
-PRIORITY 1 — VOL2VOL HEADER:
+ACTIVE VIEW:
+Identify the active view only from the visible left-side menu.
+
+Possible views include:
+- Volume / Intraday
+- Volume / EOD
+- Open Interest / OI
+- Open Interest / OI Change
+- Open Interest / Churn
+
+If "Volume > Intraday" is active, use:
+"view_type": "INTRADAY_VOLUME"
+
+HEADER FIELDS — INTRADAY VOLUME:
 Read these fields if visible:
 
-Future Stl
-Vol Stl
-Puts
-Calls
-
-For each field, capture the number directly associated with that label.
-
-PRIORITY 2 — OPEN INTEREST:
-Carefully inspect every visible occurrence of:
-
-TOTAL OPEN INTEREST
-Total Open Interest
-OPEN INTEREST
-Open Interest
-OI
-Max OI
-
-If a numeric value is directly associated with one of these labels, transcribe BOTH the label and value into raw_text.
+Product
+Expiration
+DTE
+Future Price
+Future Change
+Put
+Call
+Vol
+Vol Chg
 
 IMPORTANT:
-- Do not assume Max OI is Total Open Interest.
-- Do not assume Calls + Puts equals Total Open Interest.
-- Do not calculate Total Open Interest.
-- If "TOTAL OPEN INTEREST" is visible but its number is not readable, report "TOTAL OPEN INTEREST" as unreadable_or_missing_information.
+- "Put" and "Call" are the header values, not chart bar values.
+- "Vol" is the displayed volatility value if directly associated with the header label.
+- "Vol Chg" is the displayed volatility change.
+- "Future Change" must preserve its sign.
+- Do not confuse "Future Price" with a Strike.
+- Do not confuse "Vol" with Volume.
 
-PRIORITY 3 — VOLUME:
-Carefully inspect visible:
+STRIKE / PRICE AXIS:
+Read numeric strike or price levels that are EXPLICITLY PRINTED on the chart axis.
 
-Volume
-VOL
-Total Volume
+Store only clearly visible numeric axis levels.
 
-Transcribe the actual visible number associated with the label.
+Examples of acceptable values:
+4300
+4350
+4400
+4450
+4500
+4550
+4600
+4650
 
-Do not calculate volume from Calls and Puts.
+Do NOT:
+- estimate intermediate strikes
+- infer strikes from bar positions
+- infer strikes from spacing
+- create strikes that are not printed
+- convert chart positions into numerical values
 
-PRIORITY 4 — OI CHANGE:
-Carefully inspect visible:
+If the axis shows only some clearly readable levels, return only those levels.
 
-Change
-OI Change
-Open Interest Change
-Change in OI
+CHART DATA:
+Do not convert bar height into exact Put Volume or Call Volume numbers.
 
-Transcribe the actual visible signed number associated with the label.
+Only transcribe a chart numeric value when that number is explicitly printed next to a data point, label, or axis.
 
-Preserve negative and positive signs exactly.
+OPEN INTEREST:
+Only extract Open Interest or OI Change if an explicit numeric value is visibly associated with the corresponding label.
 
-PRIORITY 5 — EXPECTED RANGE:
+Do NOT:
+- infer Total Open Interest
+- calculate Total Open Interest
+- assume Put + Call equals Open Interest
+- infer OI from chart height
+- infer OI from another screenshot
+- copy OI from another section
 
-Expected Range
-ATM
-+1
-+2
-+3
--1
--2
--3
+EXPECTED RANGE:
+Only extract Expected Range values if they are explicitly visible in the ACTIVE view.
 
-Never convert +1/+2/+3 into 1SD/2SD/3SD.
-Never convert 1SD/2SD/3SD into +1/+2/+3.
+Do NOT create Expected Range values from the chart.
+Do NOT calculate ATM, +1, +2, +3, -1, -2, or -3.
 
-PRIORITY 6 — OTHER VISIBLE DATA:
-
-Future
-Strike
-Volatility
-Upper
-Lower
-High
-Low
-1SD
-2SD
-3SD
--1SD
--2SD
--3SD
-
-Read all relevant visible numeric values.
-
-OUTPUT RULES:
-
-Return ONLY this JSON object.
+OUTPUT:
+Return ONLY valid JSON.
 No markdown.
 No explanation.
+No prose outside JSON.
+
+Use exactly this structure:
 
 {
   "screenshot_type": "CME Options / Vol2Vol",
-  "raw_text": "verbatim transcription of all relevant visible labels and numbers",
+  "view_type": "INTRADAY_VOLUME",
+  "raw_text": "visible labels and numbers only",
+  "strike_levels": [],
   "unreadable_or_missing_information": []
 }
 
-The raw_text MUST contain the visible label together with its associated number whenever the number is readable.
+IMPORTANT:
+- Set view_type ONLY after checking the active left-side menu in the screenshot.
+- Allowed view_type values are:
+  "INTRADAY_VOLUME"
+  "EOD_VOLUME"
+  "OPEN_INTEREST"
+  "OI_CHANGE"
+  "CHURN"
+  "UNKNOWN"
+- Never choose a view_type from memory.
+- Never assume INTRADAY_VOLUME unless the screenshot visibly shows Volume > Intraday as the active view.
+- strike_levels must contain ONLY clearly readable numeric strike/price levels explicitly printed on the chart axis.
+- Do not estimate or calculate strike levels.
+- If no strike level can be read confidently, return an empty array.
 
-If a priority field is visible but its value is genuinely unreadable, put the field label in unreadable_or_missing_information.
+The raw_text must contain ONLY relevant visible labels and their directly associated readable values.
 
-Do not calculate or infer any missing value.
-`,
+For example, if the visible header is:
+Product: Gold (OG|GC)
+Expiration: OG1U6
+DTE: 0.70
+Future Price: 4485
+Future Change: -19.9
+Put: 2,682
+Call: 4,931
+Vol: 34.01
+Vol Chg: -0.20
+
+then transcribe those values exactly as visible.
+
+Do not substitute another contract.
+Do not substitute another price.
+Do not use values from memory or another image.
+
+If Strike values are clearly printed on the axis, include them in raw_text using the label "Strike:".
+
+If a required header field is visible but unreadable, add its label to unreadable_or_missing_information.
+
+Never invent a value.`,
             },
             {
               type: 'image_url',
@@ -274,7 +321,9 @@ Do not calculate or infer any missing value.
   } catch {
     result = {
       screenshot_type: 'CME Options / Vol2Vol',
+      view_type: 'UNKNOWN',
       raw_text: cleaned,
+      strike_levels: [],
       unreadable_or_missing_information: [],
     }
   }
@@ -284,8 +333,21 @@ Do not calculate or infer any missing value.
       result.screenshot_type ||
       'CME Options / Vol2Vol',
 
+    view_type:
+      result.view_type || 'UNKNOWN',
+
     raw_text:
       result.raw_text || '',
+
+    strike_levels:
+      Array.isArray(result.strike_levels)
+        ? result.strike_levels
+            .filter(
+              (value): value is number =>
+                typeof value === 'number' &&
+                Number.isFinite(value),
+            )
+        : [],
 
     unreadable_or_missing_information:
       Array.isArray(

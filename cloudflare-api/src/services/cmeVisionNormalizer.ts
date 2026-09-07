@@ -1,5 +1,7 @@
 export type CmeVisionNormalized = {
   screenshotType?: string
+  viewType?: string
+  strikeLevels?: number[]
   asOfDate?: string
 
   underlyingFutures: Array<{
@@ -92,6 +94,20 @@ export function normalizeCmeVision(
     text(source.screenshot_type) ??
     text(source.screenshotType) ??
     text(source.image_type)
+
+  const viewType =
+    text(source.view_type) ??
+    text(source.viewType)
+
+  const strikeLevels = Array.isArray(source.strike_levels)
+    ? source.strike_levels
+        .map((value) => finiteNumber(value))
+        .filter((value): value is number => value !== undefined)
+    : Array.isArray(source.strikeLevels)
+      ? source.strikeLevels
+          .map((value) => finiteNumber(value))
+          .filter((value): value is number => value !== undefined)
+      : undefined
 
   const asOfDate =
     text(source.as_of_date) ??
@@ -752,6 +768,8 @@ if (Array.isArray(source.option_rows)) {
 
   return {
     ...(screenshotType ? { screenshotType } : {}),
+    ...(viewType ? { viewType } : {}),
+    ...(strikeLevels?.length ? { strikeLevels } : {}),
     ...(asOfDate ? { asOfDate } : {}),
 
     underlyingFutures,
