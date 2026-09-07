@@ -2524,6 +2524,7 @@ if (
 ) {
   try {
     const symbol = url.searchParams.get('symbol') || 'GC'
+    const institutionalSymbol = symbol === 'XAUUSD' ? 'GC' : symbol
 
     const cmeResult = await env.DB.prepare(`
       SELECT *
@@ -2531,7 +2532,7 @@ if (
       WHERE symbol = ?
       ORDER BY data_date DESC, id DESC
       LIMIT 100
-    `).bind(symbol).all()
+    `).bind(institutionalSymbol).all()
 
     const cmeRows = cmeResult.results as any[]
 
@@ -2636,7 +2637,7 @@ if (
       WHERE symbol = ?
       ORDER BY report_date DESC, id DESC
       LIMIT 2
-    `).bind(symbol).all()
+    `).bind(institutionalSymbol).all()
 
     const cotRows = cotResult.results as any[]
 
