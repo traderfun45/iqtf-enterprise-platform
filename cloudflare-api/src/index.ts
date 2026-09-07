@@ -1,4 +1,7 @@
-import { analyzeCmeImageWithNvidia } from './services/nvidiaVision.js'
+import {
+  analyzeCmeImageWithNvidia,
+  analyzeCotImageWithNvidia,
+} from './services/nvidiaVision.js'
 import { parseCmeVol2Vol } from './services/cmeVol2VolParser.js'
 import { normalizeCmeVision } from './services/cmeVisionNormalizer.js'
 import { verifyPassword } from './services/password.js'
@@ -1547,6 +1550,66 @@ if (
       }
     }
 
+
+    // =========================================================
+    // POST /api/cot/ocr
+    // =========================================================
+    if (
+      url.pathname === '/api/cot/ocr' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const body = await request.json() as {
+          image?: string
+        }
+
+        if (!body.image) {
+          return json(
+            {
+              success: false,
+              error: 'image is required',
+            },
+            400,
+          )
+        }
+
+        const apiKey = env.NVIDIA_API_KEY
+
+        if (!apiKey) {
+          return json(
+            {
+              success: false,
+              error: 'NVIDIA_API_KEY is not configured',
+            },
+            500,
+          )
+        }
+
+        const result = await analyzeCotImageWithNvidia(
+          body.image,
+          apiKey,
+        )
+
+        return json({
+          success: true,
+          data: result,
+        })
+      } catch (error) {
+        console.error('POST /api/cot/ocr error:', error)
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to analyze COT image',
+            message:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          },
+          500,
+        )
+      }
+    }
 
     // =========================================================
     // GET /api/cot/latest

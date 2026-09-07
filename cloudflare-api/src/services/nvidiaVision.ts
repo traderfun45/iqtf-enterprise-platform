@@ -386,3 +386,335 @@ Never invent a value.`,
         : [],
   }
 }
+
+export type NvidiaCotRecord = {
+  report_date: string | null
+  total_oi: number | null
+  producer_long: number | null
+  producer_short: number | null
+  swap_dealer_long: number | null
+  swap_dealer_short: number | null
+  managed_money_long: number | null
+  managed_money_short: number | null
+  other_reportables_long: number | null
+  other_reportables_short: number | null
+}
+
+export type NvidiaCotVisionResult = {
+  screenshot_type: string
+  records: NvidiaCotRecord[]
+  unreadable_or_missing_information: string[]
+}
+
+export async function analyzeCotImageWithNvidia(
+  imageBase64: string,
+  apiKey: string,
+): Promise<NvidiaCotVisionResult> {
+  if (!apiKey) {
+    throw new Error('NVIDIA_API_KEY is not configured')
+  }
+
+  const cleanBase64 = imageBase64
+    .replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '')
+    .trim()
+
+  if (!cleanBase64) {
+    throw new Error('Image base64 is empty')
+  }
+
+  const fetchStartedAt = Date.now()
+
+  console.log('[NVIDIA COT] FETCH START', {
+    model: NVIDIA_MODEL,
+    imageBase64Length: cleanBase64.length,
+  })
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 60_000)
+
+  let response: Response
+
+  try {
+    response = await fetch(NVIDIA_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: NVIDIA_MODEL,
+        temperature: 0,
+        max_tokens: 2500,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `OCR TASK ONLY.
+
+Read ONLY the visible COT positioning table in this screenshot.
+
+This is a CFTC / Commitment of Traders style report.
+
+The screenshot may contain multiple historical report blocks.
+Extract EVERY report block that is visibly readable.
+
+DO NOT:
+- analyze the market
+- calculate net positions
+- calculate scores
+- infer missing values
+- estimate numbers
+- correct OCR using memory
+- combine columns
+- derive totals
+- invent values
+- use values from another screenshot
+
+For every visible report block extract:
+
+report_date
+total_oi
+producer_long
+producer_short
+swap_dealer_long
+swap_dealer_short
+managed_money_long
+managed_money_short
+other_reportables_long
+other_reportables_short
+
+IMPORTANT:
+
+1. Preserve the date exactly as visibly printed.
+2. Preserve every numeric value exactly as visibly printed.
+3. TOTAL OI must be associated with the date in the SAME report block.
+4. Do not select only the newest report.
+5. Extract all clearly readable historical report blocks.
+6. Do not calculate any missing field.
+7. If a field is unreadable or absent, return null.
+8. If a number cannot be read confidently, return null and list the field in unreadable_or_missing_information.
+9. Do not map values between different report dates.
+10. Do not use chart values or visual estimates.
+11. Do not calculate LONG minus SHORT.
+12. Do not calculate percentages.
+13. Do not infer values from row alignment if the label/column is not readable.
+14. Use only values actually visible in the screenshot.
+
+The table may visibly contain category/column labels such as:
+PRODUCER
+SWAP DEALER
+MANAGED
+NONRPT / OTHER REPORTABLES
+LNG
+SHRT
+SPRD
+TOT
+
+Use the visible table headers to identify the correct columns.
+Do not assume a value belongs to a category unless the screenshot supports that mapping.
+
+OUTPUT:
+Return ONLY valid JSON.
+No markdown.
+No explanation.
+No prose outside JSON.
+
+Use exactly this structure:
+
+{
+  "screenshot_type": "COT",
+  "records": [
+    {
+      "report_date": "11/8/2569",
+      "total_oi": 400309,
+      "producer_long": 15716,
+      "producer_short": 43651,
+      "swap_dealer_long": 19092,
+      "swap_dealer_short": 243797,
+      "managed_money_long": 148634,
+      "managed_money_short": 10972,
+      "other_reportables_long": 102302,
+      "other_reportables_short": 22024
+    }
+  ],
+  "unreadable_or_missing_information": []
+}
+
+If a value is not confidently readable, use null.
+Never invent a value.`,
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${cleanBase64}`,
+                },
+              },
+            ],
+          },
+        ],
+      }),
+      signal: controller.signal,
+    })
+  } catch (error) {
+    const elapsedMs = Date.now() - fetchStartedAt
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(
+        `NVIDIA COT Vision fetch timeout after 60 seconds (elapsed ${elapsedMs} ms)`,
+      )
+    }
+
+    if (error instanceof Error) {
+      throw new Error(
+        `NVIDIA COT Vision fetch error after ${elapsedMs} ms: ${error.name}: ${error.message}`,
+      )
+    }
+
+    throw new Error(
+      `NVIDIA COT Vision fetch error after ${elapsedMs} ms: ${String(error)}`,
+    )
+  } finally {
+    clearTimeout(timeout)
+  }
+
+  console.log('[NVIDIA COT] FETCH RESPONSE', {
+    status: response.status,
+    elapsedMs: Date.now() - fetchStartedAt,
+  })
+
+  const responseText = await response.text()
+
+  if (!response.ok) {
+    throw new Error(
+      `NVIDIA COT Vision HTTP ${response.status}: ${responseText}`,
+    )
+  }
+
+  let payload: any
+
+  try {
+    payload = JSON.parse(responseText)
+  } catch {
+    throw new Error(
+      `NVIDIA COT Vision returned invalid JSON: ${responseText}`,
+    )
+  }
+
+  const content = payload?.choices?.[0]?.message?.content
+
+  if (!content) {
+    throw new Error(
+      'NVIDIA COT Vision response missing choices[0].message.content',
+    )
+  }
+
+  const cleaned = String(content)
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim()
+
+  let parsed: any
+
+  try {
+    parsed = JSON.parse(cleaned)
+  } catch {
+    const jsonStart = cleaned.indexOf('{')
+    const jsonEnd = cleaned.lastIndexOf('}')
+
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      try {
+        parsed = JSON.parse(
+          cleaned.slice(jsonStart, jsonEnd + 1),
+        )
+      } catch {
+        parsed = {}
+      }
+    } else {
+      parsed = {}
+    }
+  }
+
+  const records = Array.isArray(parsed?.records)
+    ? parsed.records
+        .map((record: any): NvidiaCotRecord => ({
+          report_date:
+            typeof record?.report_date === 'string'
+              ? record.report_date.trim()
+              : null,
+
+          total_oi:
+            typeof record?.total_oi === 'number' &&
+            Number.isFinite(record.total_oi)
+              ? record.total_oi
+              : null,
+
+          producer_long:
+            typeof record?.producer_long === 'number' &&
+            Number.isFinite(record.producer_long)
+              ? record.producer_long
+              : null,
+
+          producer_short:
+            typeof record?.producer_short === 'number' &&
+            Number.isFinite(record.producer_short)
+              ? record.producer_short
+              : null,
+
+          swap_dealer_long:
+            typeof record?.swap_dealer_long === 'number' &&
+            Number.isFinite(record.swap_dealer_long)
+              ? record.swap_dealer_long
+              : null,
+
+          swap_dealer_short:
+            typeof record?.swap_dealer_short === 'number' &&
+            Number.isFinite(record.swap_dealer_short)
+              ? record.swap_dealer_short
+              : null,
+
+          managed_money_long:
+            typeof record?.managed_money_long === 'number' &&
+            Number.isFinite(record.managed_money_long)
+              ? record.managed_money_long
+              : null,
+
+          managed_money_short:
+            typeof record?.managed_money_short === 'number' &&
+            Number.isFinite(record.managed_money_short)
+              ? record.managed_money_short
+              : null,
+
+          other_reportables_long:
+            typeof record?.other_reportables_long === 'number' &&
+            Number.isFinite(record.other_reportables_long)
+              ? record.other_reportables_long
+              : null,
+
+          other_reportables_short:
+            typeof record?.other_reportables_short === 'number' &&
+            Number.isFinite(record.other_reportables_short)
+              ? record.other_reportables_short
+              : null,
+        }))
+    : []
+
+  return {
+    screenshot_type:
+      typeof parsed?.screenshot_type === 'string'
+        ? parsed.screenshot_type
+        : 'COT',
+
+    records,
+
+    unreadable_or_missing_information:
+      Array.isArray(parsed?.unreadable_or_missing_information)
+        ? parsed.unreadable_or_missing_information.filter(
+            (value: unknown): value is string =>
+              typeof value === 'string',
+          )
+        : [],
+  }
+}
