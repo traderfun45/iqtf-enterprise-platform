@@ -222,6 +222,94 @@ export function parseCmeVol2Vol(
     }
   }
 
+  // ------------------------------------------------------------
+  // Aggregate Volume
+  //
+  // IMPORTANT:
+  // - Do NOT derive volume from Put + Call.
+  // - Do NOT treat "Vol" (volatility) as aggregate volume.
+  // - Only accept an explicitly labelled aggregate Volume field.
+  // ------------------------------------------------------------
+
+  if (result.volume === undefined) {
+    const match = text.match(
+      /(?:Total\s+)?Volume(?:\s*:\s*|\s+-\s+|\s+)([+-]?[\d,.]+)/i,
+    )
+
+    if (match) {
+      result.volume = parseCount(match[1])
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Open Interest
+  //
+  // Only accept explicitly labelled aggregate OI.
+  // Do NOT infer from option rows or Calls + Puts.
+  // ------------------------------------------------------------
+
+  if (result.openInterest === undefined) {
+    const match = text.match(
+      /(?:Total\s+)?Open\s+Interest(?:\s*:\s*|\s+-\s+|\s+)([+-]?[\d,.]+)/i,
+    )
+
+    if (match) {
+      result.openInterest = parseCount(match[1])
+    }
+  }
+
+  if (result.openInterest === undefined) {
+    const match = text.match(
+      /\bOI(?:\s*:\s*|\s+-\s+|\s+)([+-]?[\d,.]+)/i,
+    )
+
+    if (match) {
+      result.openInterest = parseCount(match[1])
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Open Interest Change
+  //
+  // Preserve the visible sign exactly.
+  // ------------------------------------------------------------
+
+  if (result.oiChange === undefined) {
+    const match = text.match(
+      /(?:Open\s+Interest\s+Change|OI\s+Change|Change\s+in\s+OI)(?:\s*:\s*|\s+-\s+|\s+)([+-]?[\d,.]+)/i,
+    )
+
+    if (match) {
+      result.oiChange = parseCount(match[1])
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Explicit Z-scores only
+  //
+  // Never calculate these values here.
+  // ------------------------------------------------------------
+
+  if (result.volumeZscore === undefined) {
+    const match = text.match(
+      /(?:Volume\s+Z[-\s]?Score|Volume\s+Z)(?:\s*:\s*|\s+-\s+|\s+)([+-]?[\d,.]+)/i,
+    )
+
+    if (match) {
+      result.volumeZscore = parseDecimal(match[1])
+    }
+  }
+
+  if (result.oiZscore === undefined) {
+    const match = text.match(
+      /(?:OI\s+Z[-\s]?Score|Open\s+Interest\s+Z[-\s]?Score|OI\s+Z)(?:\s*:\s*|\s+-\s+|\s+)([+-]?[\d,.]+)/i,
+    )
+
+    if (match) {
+      result.oiZscore = parseDecimal(match[1])
+    }
+  }
+
   // Expected Range
   //
   // NVIDIA Vision may return Markdown:

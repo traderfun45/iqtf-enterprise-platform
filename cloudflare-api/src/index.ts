@@ -809,6 +809,12 @@ if (
 
             put_volume:
               parsedVol2Vol.putVolume,
+    volume: parsedVol2Vol.volume,
+    volumeZscore: parsedVol2Vol.volumeZscore,
+    openInterest: parsedVol2Vol.openInterest,
+    oiChange: parsedVol2Vol.oiChange,
+    oiZscore: parsedVol2Vol.oiZscore,
+
           })
 
         console.log(

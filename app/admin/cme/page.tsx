@@ -30,6 +30,11 @@ type CmeOcrResult = {
   volatilitySettlement?: number
   callVolume?: number
   putVolume?: number
+  volume?: number
+  volumeZscore?: number
+  openInterest?: number
+  oiChange?: number
+  oiZscore?: number
   expectedRange?: {
     minus3?: number
     minus2?: number
@@ -218,16 +223,19 @@ async function handleScanImage() {
         current.settlementPrice,
 
       volume:
-        current.volume,
+        data.volume ?? current.volume,
+
+      volumeZscore:
+        data.volumeZscore ?? current.volumeZscore,
 
       openInterest:
-        current.openInterest,
+        data.openInterest ?? current.openInterest,
 
       oiChange:
-        current.oiChange,
+        data.oiChange ?? current.oiChange,
 
       oiZscore:
-        current.oiZscore,
+        data.oiZscore ?? current.oiZscore,
 
       inputMethod: 'OCR',
       imageReference: selectedImage.name,

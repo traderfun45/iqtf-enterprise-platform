@@ -22,6 +22,12 @@ volatilityCurve?: unknown
 
 callVolume?: number
 putVolume?: number
+  volume?: number
+  volumeZscore?: number
+  openInterest?: number
+  oiChange?: number
+  oiZscore?: number
+
 
 expectedRange?: unknown
 
@@ -271,6 +277,33 @@ const callVolume = finiteNumber(
 const putVolume = finiteNumber(
   source.put_volume ??
   source.putVolume,
+)
+
+const volume = finiteNumber(
+  source.volume ??
+  source.total_volume ??
+  source.totalVolume,
+)
+
+const volumeZscore = finiteNumber(
+  source.volume_zscore ??
+  source.volumeZscore,
+)
+
+const openInterest = finiteNumber(
+  source.open_interest ??
+  source.openInterest ??
+  source.oi,
+)
+
+const oiChange = finiteNumber(
+  source.oi_change ??
+  source.oiChange,
+)
+
+const oiZscore = finiteNumber(
+  source.oi_zscore ??
+  source.oiZscore,
 )
 
   const volatilityCurve =
@@ -786,6 +819,11 @@ if (Array.isArray(source.option_rows)) {
 ...(putVolume !== undefined
   ? { putVolume }
   : {}),
+  ...(volume !== undefined ? { volume } : {}),
+  ...(volumeZscore !== undefined ? { volumeZscore } : {}),
+  ...(openInterest !== undefined ? { openInterest } : {}),
+  ...(oiChange !== undefined ? { oiChange } : {}),
+  ...(oiZscore !== undefined ? { oiZscore } : {}),
 
     ...(volatilityCurve !== undefined
       ? { volatilityCurve }

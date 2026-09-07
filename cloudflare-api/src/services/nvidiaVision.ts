@@ -319,12 +319,33 @@ Never invent a value.`,
   try {
     result = JSON.parse(cleaned)
   } catch {
-    result = {
-      screenshot_type: 'CME Options / Vol2Vol',
-      view_type: 'UNKNOWN',
-      raw_text: cleaned,
-      strike_levels: [],
-      unreadable_or_missing_information: [],
+    // NVIDIA may occasionally wrap valid JSON in explanatory prose.
+    // Extract the JSON object without deriving or inventing any values.
+    const jsonStart = cleaned.indexOf('{')
+    const jsonEnd = cleaned.lastIndexOf('}')
+
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      try {
+        result = JSON.parse(
+          cleaned.slice(jsonStart, jsonEnd + 1),
+        )
+      } catch {
+        result = {
+          screenshot_type: 'CME Options / Vol2Vol',
+          view_type: 'UNKNOWN',
+          raw_text: cleaned,
+          strike_levels: [],
+          unreadable_or_missing_information: [],
+        }
+      }
+    } else {
+      result = {
+        screenshot_type: 'CME Options / Vol2Vol',
+        view_type: 'UNKNOWN',
+        raw_text: cleaned,
+        strike_levels: [],
+        unreadable_or_missing_information: [],
+      }
     }
   }
 
