@@ -130,27 +130,21 @@ export function analyzeCmeIntelligence(params: {
       ? params.previousPrice!
       : price
 
-  const volume = Number.isFinite(params.volume)
-    ? params.volume!
-    : 0
+  const hasVolume = Number.isFinite(params.volume)
+  const hasPreviousVolume = Number.isFinite(params.previousVolume)
 
-  const previousVolume =
-    Number.isFinite(params.previousVolume)
-      ? params.previousVolume!
-      : volume
+  const hasOI = Number.isFinite(params.openInterest)
+  const hasPreviousOI = Number.isFinite(params.previousOpenInterest)
 
-  const oi = Number.isFinite(
-    params.openInterest,
-  )
-    ? params.openInterest!
-    : 0
+  const volume = hasVolume ? params.volume! : 0
+  const previousVolume = hasPreviousVolume
+    ? params.previousVolume!
+    : volume
 
-  const previousOI =
-    Number.isFinite(
-      params.previousOpenInterest,
-    )
-      ? params.previousOpenInterest!
-      : oi
+  const oi = hasOI ? params.openInterest! : 0
+  const previousOI = hasPreviousOI
+    ? params.previousOpenInterest!
+    : oi
 
   const priceChange =
     price - previousPrice
@@ -162,34 +156,46 @@ export function analyzeCmeIntelligence(params: {
     )
 
   const volumeChange =
-    volume - previousVolume
+    hasVolume && hasPreviousVolume
+      ? volume - previousVolume
+      : 0
 
   const volumeChangePercent =
-    percentChange(
-      volume,
-      previousVolume,
-    )
+    hasVolume && hasPreviousVolume
+      ? percentChange(
+          volume,
+          previousVolume,
+        )
+      : 0
 
   const oiChange =
-    oi - previousOI
+    hasOI && hasPreviousOI
+      ? oi - previousOI
+      : 0
 
   const oiChangePercent =
-    percentChange(
-      oi,
-      previousOI,
-    )
+    hasOI && hasPreviousOI
+      ? percentChange(
+          oi,
+          previousOI,
+        )
+      : 0
 
   const volumeZ =
-    zscore(
-      volumeChange,
-      params.historicalVolumeChanges ?? [],
-    )
+    hasVolume && hasPreviousVolume
+      ? zscore(
+          volumeChange,
+          params.historicalVolumeChanges ?? [],
+        )
+      : null
 
   const oiZ =
-    zscore(
-      oiChange,
-      params.historicalOIChanges ?? [],
-    )
+    hasOI && hasPreviousOI
+      ? zscore(
+          oiChange,
+          params.historicalOIChanges ?? [],
+        )
+      : null
 
   let positioning: CmePositioning =
     'NEUTRAL'
@@ -221,10 +227,14 @@ export function analyzeCmeIntelligence(params: {
   }
 
   const volumeConfirmation =
-    strength(volumeZ)
+    hasVolume && hasPreviousVolume
+      ? strength(volumeZ)
+      : 'INSUFFICIENT_DATA'
 
   const oiConfirmation =
-    strength(oiZ)
+    hasOI && hasPreviousOI
+      ? strength(oiZ)
+      : 'INSUFFICIENT_DATA'
 
   const priceSignal =
     priceChange > 0
@@ -234,18 +244,22 @@ export function analyzeCmeIntelligence(params: {
         : 0
 
   const oiSignal =
-    oiChange > 0
-      ? 1
-      : oiChange < 0
-        ? -1
-        : 0
+    hasOI && hasPreviousOI
+      ? oiChange > 0
+        ? 1
+        : oiChange < 0
+          ? -1
+          : 0
+      : 0
 
   const volumeSignal =
-    volumeChange > 0
-      ? 1
-      : volumeChange < 0
-        ? -1
-        : 0
+    hasVolume && hasPreviousVolume
+      ? volumeChange > 0
+        ? 1
+        : volumeChange < 0
+          ? -1
+          : 0
+      : 0
 
   const confirmationScore =
     Math.max(

@@ -2566,14 +2566,45 @@ if (
     const previousPrice = previous
       ? Number(previous.settlement_price ?? latestPrice)
       : latestPrice
-    const latestVolume = Number(latest.volume ?? 0)
-    const previousVolume = previous
-      ? Number(previous.volume ?? latestVolume)
-      : latestVolume
-    const latestOi = Number(latest.open_interest ?? 0)
-    const previousOi = previous
-      ? Number(previous.open_interest ?? latestOi)
-      : latestOi
+    const latestVolume =
+      latest.volume == null ? undefined : Number(latest.volume)
+    const previousVolume =
+      previous?.volume == null
+        ? undefined
+        : Number(previous.volume)
+
+    const latestOi =
+      latest.open_interest == null
+        ? undefined
+        : Number(latest.open_interest)
+    const previousOi =
+      previous?.open_interest == null
+        ? undefined
+        : Number(previous.open_interest)
+
+    const historicalVolumeChanges = cmeRows
+      .slice(0, -1)
+      .map((row, i) => {
+        const current = row.volume
+        const previousRow = cmeRows[i + 1]?.volume
+
+        if (current == null || previousRow == null) return null
+
+        return Number(current) - Number(previousRow)
+      })
+      .filter((value): value is number => value !== null)
+
+    const historicalOIChanges = cmeRows
+      .slice(0, -1)
+      .map((row, i) => {
+        const current = row.open_interest
+        const previousRow = cmeRows[i + 1]?.open_interest
+
+        if (current == null || previousRow == null) return null
+
+        return Number(current) - Number(previousRow)
+      })
+      .filter((value): value is number => value !== null)
 
     const cme = analyzeCmeIntelligence({
       price: latestPrice,
@@ -2582,18 +2613,14 @@ if (
       previousVolume,
       openInterest: latestOi,
       previousOpenInterest: previousOi,
-      historicalVolumeChanges: cmeRows
-        .slice(0, -1)
-        .map((row, i) => Number(row.volume ?? 0) - Number(cmeRows[i + 1]?.volume ?? 0)),
-      historicalOIChanges: cmeRows
-        .slice(0, -1)
-        .map((row, i) => Number(row.open_interest ?? 0) - Number(cmeRows[i + 1]?.open_interest ?? 0)),
+      historicalVolumeChanges,
+      historicalOIChanges,
     })
 
     const vol2vol = analyzeVol2Vol({
       priceChange: latestPrice - previousPrice,
-      volumeChange: latestVolume - previousVolume,
-      openInterestChange: latestOi - previousOi,
+      volumeChange: latestVolume != null && previousVolume != null ? latestVolume - previousVolume : 0,
+      openInterestChange: latestOi != null && previousOi != null ? latestOi - previousOi : 0,
       volumeZscore: Number(latest.volume_zscore ?? 0),
       oiZscore: Number(latest.oi_zscore ?? 0),
       positioning: cme.positioning,
