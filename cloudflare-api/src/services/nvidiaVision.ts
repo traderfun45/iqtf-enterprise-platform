@@ -444,7 +444,7 @@ export async function analyzeCotImageWithNvidia(
       body: JSON.stringify({
         model: NVIDIA_MODEL,
         temperature: 0,
-        max_tokens: 2500,
+        max_tokens: 4000,
         messages: [
           {
             role: 'user',
@@ -616,11 +616,24 @@ Never invent a value.`,
     .replace(/\s*```$/i, '')
     .trim()
 
+  console.log('[NVIDIA COT] CONTENT', {
+    contentLength: String(content).length,
+    cleanedLength: cleaned.length,
+    finishReason: payload?.choices?.[0]?.finish_reason ?? null,
+    contentTail: cleaned.slice(-500),
+  })
+
   let parsed: any
 
   try {
     parsed = JSON.parse(cleaned)
-  } catch {
+  } catch (error) {
+    console.error('[NVIDIA COT] JSON PARSE FAILED', {
+      error: error instanceof Error ? error.message : String(error),
+      cleanedLength: cleaned.length,
+      contentTail: cleaned.slice(-1000),
+    })
+
     const jsonStart = cleaned.indexOf('{')
     const jsonEnd = cleaned.lastIndexOf('}')
 
@@ -630,10 +643,14 @@ Never invent a value.`,
           cleaned.slice(jsonStart, jsonEnd + 1),
         )
       } catch {
-        parsed = {}
+        throw new Error(
+          `NVIDIA COT Vision returned incomplete/invalid model JSON (length ${cleaned.length})`,
+        )
       }
     } else {
-      parsed = {}
+      throw new Error(
+        `NVIDIA COT Vision returned incomplete model JSON (length ${cleaned.length})`,
+      )
     }
   }
 
