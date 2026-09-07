@@ -2710,6 +2710,13 @@ if (
       cmeConfirmation: Number(cme.confirmationScore ?? 0),
       vol2volScore: Number(vol2vol.score ?? 0),
       cotScore: Number(cot.intelligence.score ?? 0),
+  marketSignal: marketIntelligence.signal,
+  marketStructure: marketIntelligence.structure.direction,
+  volatilityRegime: marketIntelligence.volatilityRegime.regime,
+  cmePositioning: cme.positioning,
+  cmeOiConfirmation: cme.oiConfirmation,
+  vol2volSignal: vol2vol.signal,
+  cotPositioning: cot.intelligence.positioning,
     })
 
     const institutionalScore =
