@@ -53,7 +53,7 @@ export async function analyzeCmeImageWithNvidia(
     body: JSON.stringify({
       model: NVIDIA_MODEL,
       temperature: 0,
-      max_tokens: 4000,
+      max_tokens: 1000,
       messages: [
         {
           role: 'user',
