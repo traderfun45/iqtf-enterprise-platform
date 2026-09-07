@@ -68,7 +68,7 @@ IMPORTANT:
 This screenshot may show different CME views.
 FIRST identify which view is ACTIVE from the left-side menu.
 
-For an "Intraday Volume" view, focus on the visible header and price/strike axis.
+For an "Intraday Volume" view, read the visible header, price/strike axis, and any explicitly printed Open Interest / TOTAL OI information that is visible in the screenshot.
 Do NOT reinterpret the screenshot as an Expected Range page.
 
 DO NOT:
@@ -164,15 +164,23 @@ Do not convert bar height into exact Put Volume or Call Volume numbers.
 Only transcribe a chart numeric value when that number is explicitly printed next to a data point, label, or axis.
 
 OPEN INTEREST:
-Only extract Open Interest or OI Change if an explicit numeric value is visibly associated with the corresponding label.
+Read explicitly printed Open Interest information anywhere in the screenshot when it is clearly associated with an OI label.
 
-Do NOT:
-- infer Total Open Interest
-- calculate Total Open Interest
-- assume Put + Call equals Open Interest
-- infer OI from chart height
-- infer OI from another screenshot
-- copy OI from another section
+This includes labels such as:
+- Open Interest
+- OI
+- TOTAL OI
+- OI Change
+
+When TOTAL OI appears together with a date, preserve the date and value together in raw_text.
+
+IMPORTANT:
+- Transcribe the visible date and OI value exactly.
+- Do not select one date as the current/latest value.
+- Do not map a historical TOTAL OI value to the current settlement automatically.
+- Do not calculate or infer OI.
+- Do not combine Put + Call.
+- Do not infer OI from chart height.
 
 EXPECTED RANGE:
 Only extract Expected Range values if they are explicitly visible in the ACTIVE view.
@@ -211,7 +219,7 @@ IMPORTANT:
 - Do not estimate or calculate strike levels.
 - If no strike level can be read confidently, return an empty array.
 
-The raw_text must contain ONLY relevant visible labels and their directly associated readable values.
+The raw_text must contain ONLY relevant visible labels and their directly associated readable values, including explicitly printed OI information with its associated date when present.
 
 For example, if the visible header is:
 Product: Gold (OG|GC)
