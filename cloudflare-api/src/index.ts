@@ -1554,6 +1554,66 @@ if (
       }
     }
 
+    // =========================================================
+    // DELETE /api/cot/:id
+    // =========================================================
+    if (
+      url.pathname.startsWith('/api/cot/') &&
+      request.method === 'DELETE'
+    ) {
+      try {
+        const id = Number(
+          url.pathname.split('/').pop(),
+        )
+
+        if (!Number.isInteger(id) || id <= 0) {
+          return json(
+            {
+              success: false,
+              error: 'Invalid COT id',
+            },
+            400,
+          )
+        }
+
+        const result = await env.DB.prepare(`
+          DELETE FROM cot_market_data
+          WHERE id = ?
+          RETURNING *
+        `)
+          .bind(id)
+          .first()
+
+        if (!result) {
+          return json(
+            {
+              success: false,
+              error: 'COT record not found',
+            },
+            404,
+          )
+        }
+
+        return json({
+          success: true,
+          data: result,
+        })
+      } catch (error) {
+        console.error(
+          'DELETE /api/cot/:id error:',
+          error,
+        )
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to delete COT data',
+          },
+          500,
+        )
+      }
+    }
+
 
     // =========================================================
     // POST /api/cot/ocr
@@ -2018,6 +2078,35 @@ if (
             {
               success: false,
               error: 'symbol and reportDate are required',
+            },
+            400,
+          )
+        }
+
+        const numericFields = [
+          body.openInterest,
+          body.producerLong,
+          body.producerShort,
+          body.swapDealerLong,
+          body.swapDealerShort,
+          body.managedMoneyLong,
+          body.managedMoneyShort,
+          body.otherReportablesLong,
+          body.otherReportablesShort,
+        ]
+
+        if (
+          numericFields.some(
+            (value) =>
+              typeof value !== 'number' ||
+              !Number.isFinite(value),
+          )
+        ) {
+          return json(
+            {
+              success: false,
+              error:
+                'All COT numeric fields are required',
             },
             400,
           )

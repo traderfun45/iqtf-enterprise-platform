@@ -203,6 +203,32 @@ export default function CotAdminPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+
+  const numericFields = [
+    form.openInterest,
+    form.producerLong,
+    form.producerShort,
+    form.swapDealerLong,
+    form.swapDealerShort,
+    form.managedMoneyLong,
+    form.managedMoneyShort,
+    form.otherReportablesLong,
+    form.otherReportablesShort,
+  ]
+
+  if (
+    numericFields.some(
+      (value) =>
+        typeof value !== 'number' ||
+        !Number.isFinite(value),
+    )
+  ) {
+    setMessage(
+      'Please enter all COT numeric fields before saving',
+    )
+    return
+  }
+
     setLoading(true)
     setMessage('')
 
