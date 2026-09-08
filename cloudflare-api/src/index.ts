@@ -15,6 +15,7 @@ import { resolveVol2VolState } from './services/vol2volState.js'
 import { buildHistoricalChanges } from './services/institutional.js'
 import { calculateIqtfDecision } from './services/iqtfDecision.js'
 import { getVol2VolState, saveVol2VolState } from './db/vol2volState.js'
+import { validateCotRecord } from './services/cotOcrValidator.js'
 
 export interface Env {
   DB: D1Database
@@ -1601,6 +1602,108 @@ if (
           {
             success: false,
             error: 'Failed to analyze COT image',
+            message:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          },
+          500,
+        )
+      }
+    }
+
+    // =========================================================
+    // POST /api/cot/ocr/validate
+    // =========================================================
+    if (
+      url.pathname === '/api/cot/ocr/validate' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const body = await request.json() as {
+          symbol?: string
+          records?: Array<{
+            report_date: string | null
+            total_oi: number | null
+            producer_long: number | null
+            producer_short: number | null
+            swap_dealer_long: number | null
+            swap_dealer_short: number | null
+            managed_money_long: number | null
+            managed_money_short: number | null
+            other_reportables_long: number | null
+            other_reportables_short: number | null
+          }>
+        }
+
+        const symbol = body.symbol || 'GC'
+        const records = body.records || []
+
+        if (!Array.isArray(records) || records.length === 0) {
+          return json(
+            {
+              success: false,
+              error: 'records are required',
+            },
+            400,
+          )
+        }
+
+        const results = []
+
+        for (const record of records) {
+          if (!record.report_date) {
+            results.push(
+              validateCotRecord(record, null),
+            )
+            continue
+          }
+
+          const existing = await env.DB.prepare(`
+            SELECT
+              report_date,
+              open_interest AS total_oi,
+              producer_long,
+              producer_short,
+              swap_dealer_long,
+              swap_dealer_short,
+              managed_money_long,
+              managed_money_short,
+              other_reportables_long,
+              other_reportables_short
+            FROM cot_market_data
+            WHERE symbol = ?
+              AND report_date = ?
+            ORDER BY id DESC
+            LIMIT 1
+          `)
+            .bind(symbol, record.report_date)
+            .first()
+
+          results.push(
+            validateCotRecord(
+              record,
+              existing,
+            ),
+          )
+        }
+
+        return json({
+          success: true,
+          symbol,
+          count: results.length,
+          results,
+        })
+      } catch (error) {
+        console.error(
+          'POST /api/cot/ocr/validate error:',
+          error,
+        )
+
+        return json(
+          {
+            success: false,
+            error: 'Failed to validate COT OCR',
             message:
               error instanceof Error
                 ? error.message
