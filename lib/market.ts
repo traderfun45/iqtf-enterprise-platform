@@ -87,10 +87,35 @@ export async function getMarketIntelligence(
     outputsize: String(outputsize),
   })
 
-  return apiGet<Intelligence>(
-    `/api/market/intelligence?${params.toString()}`,
-    15000
-  )
+  const path = `/api/market/intelligence?${params.toString()}`
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await apiGet<Intelligence>(path, 15000)
+    } catch (error) {
+      lastError = error
+
+      const message =
+        error instanceof Error ? error.message : String(error)
+
+      const retryable =
+        /^(502|503|504)\b/.test(message) ||
+        message.toLowerCase().includes("timeout")
+
+      if (!retryable || attempt === 3) {
+        throw error
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, 500 * attempt)
+      )
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Market intelligence unavailable")
 }
 export type CmeAnalysis = {
   success: boolean
