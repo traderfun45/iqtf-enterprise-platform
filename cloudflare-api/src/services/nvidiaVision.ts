@@ -430,7 +430,7 @@ export async function analyzeCotImageWithNvidia(
   })
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 60_000)
+  const timeout = setTimeout(() => controller.abort(), 90_000)
 
   let response: Response
 
@@ -444,7 +444,7 @@ export async function analyzeCotImageWithNvidia(
       body: JSON.stringify({
         model: NVIDIA_MODEL,
         temperature: 0,
-        max_tokens: 4000,
+        max_tokens: 1200,
         messages: [
           {
             role: 'user',
