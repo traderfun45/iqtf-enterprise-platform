@@ -578,25 +578,23 @@ function getExecutiveSummary(
     }
   }
 
-  const bias =
-    monitoring.scenario === "BULLISH"
-      ? "BULLISH"
-      : monitoring.scenario === "BEARISH"
-        ? "BEARISH"
-        : "NEUTRAL"
-
-    const risk =
-      alert.level === "HIGH"
-        ? "HIGH"
-        : decision.risk === "ELEVATED"
-          ? "ELEVATED"
-          : decision.risk === "LOW"
-            ? "LOW"
-            : "NORMAL"
+  // IQTF decision is the authoritative executive state.
+  const bias = decision.bias
+  const risk = decision.risk
 
   let verdict = "NEUTRAL — WAIT FOR CONFIRMATION"
 
   if (
+    decision.action === "WAIT" &&
+    decision.risk === "HIGH"
+  ) {
+    verdict = "NO TRADE — RISK / CONFIRMATION GATE"
+  } else if (
+    decision.action === "WAIT" &&
+    decision.confidence < 50
+  ) {
+    verdict = "NO TRADE — WAIT FOR CONFIRMATION"
+  } else if (
     actionContext.action === "PREPARE LONG" &&
     monitoring.confirmation === "CONFIRMED"
   ) {
@@ -606,8 +604,7 @@ function getExecutiveSummary(
     monitoring.confirmation === "CONFIRMED"
   ) {
     verdict = "SHORT SCENARIO — WAIT FOR TRIGGER"
-  } else 
-if (alert.level === "HIGH") {
+  } else if (alert.level === "HIGH") {
     verdict = "RISK ELEVATED — PROTECT CAPITAL"
   } else if (bias === "BULLISH") {
     verdict = "BULLISH BIAS — CONFIRM MOMENTUM"
