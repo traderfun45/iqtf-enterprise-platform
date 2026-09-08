@@ -648,9 +648,90 @@ Never invent a value.`,
         )
       }
     } else {
-      throw new Error(
-        `NVIDIA COT Vision returned incomplete model JSON (length ${cleaned.length})`,
-      )
+      // NVIDIA Vision may occasionally return accurate OCR as Markdown
+      // despite the JSON-only instruction. Parse only explicitly printed
+      // labeled values; never infer or calculate missing values.
+      const lines = cleaned.split(/\r?\n/)
+
+      const records: NvidiaCotRecord[] = []
+      let current: Partial<NvidiaCotRecord> | null = null
+
+      const numberValue = (value: string): number | null => {
+        const match = value.match(/[-+]?\d[\d,]*(?:\.\d+)?/)
+        if (!match) return null
+        const normalized = match[0].replace(/,/g, '')
+        const number = Number(normalized)
+        return Number.isFinite(number) ? number : null
+      }
+
+      const fieldPatterns: Array<
+        [keyof NvidiaCotRecord, RegExp]
+      > = [
+        ['total_oi', /total\s*oi\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
+        ['producer_long', /producer\s+long\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
+        ['producer_short', /producer\s+short\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
+        ['swap_dealer_long', /swap\s+dealer\s+long\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
+        ['swap_dealer_short', /swap\s+dealer\s+short\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
+        ['managed_money_long', /managed\s+money\s+long\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
+        ['managed_money_short', /managed\s+money\s+short\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
+        ['other_reportables_long', /other\s+reportables\s+long\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
+        ['other_reportables_short', /other\s+reportables\s+short\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
+      ]
+
+      const datePattern =
+        /^\s*\**\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\s*\**\s*$/
+
+      const flush = () => {
+        if (!current?.report_date) return
+
+        records.push({
+          report_date: current.report_date ?? null,
+          total_oi: current.total_oi ?? null,
+          producer_long: current.producer_long ?? null,
+          producer_short: current.producer_short ?? null,
+          swap_dealer_long: current.swap_dealer_long ?? null,
+          swap_dealer_short: current.swap_dealer_short ?? null,
+          managed_money_long: current.managed_money_long ?? null,
+          managed_money_short: current.managed_money_short ?? null,
+          other_reportables_long: current.other_reportables_long ?? null,
+          other_reportables_short: current.other_reportables_short ?? null,
+        })
+      }
+
+      for (const line of lines) {
+        const dateMatch = line.match(datePattern)
+
+        if (dateMatch) {
+          flush()
+          current = { report_date: dateMatch[1] }
+          continue
+        }
+
+        if (!current) continue
+
+        for (const [field, pattern] of fieldPatterns) {
+          const match = line.match(pattern)
+
+          if (match) {
+            current[field] = numberValue(match[1])
+            break
+          }
+        }
+      }
+
+      flush()
+
+      if (records.length > 0) {
+        parsed = {
+          screenshot_type: 'COT',
+          records,
+          unreadable_or_missing_information: [],
+        }
+      } else {
+        throw new Error(
+          `NVIDIA COT Vision returned unparseable OCR text (length ${cleaned.length})`,
+        )
+      }
     }
   }
 
