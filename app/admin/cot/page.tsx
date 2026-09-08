@@ -121,10 +121,44 @@ export default function CotAdminPage() {
       )
 
       const result = (await response.json()) as {
-        data?: CotData[]
+        data?: Array<{
+          id?: number
+          symbol: string
+          report_date: string
+          open_interest?: number | null
+          producer_long?: number | null
+          producer_short?: number | null
+          swap_dealer_long?: number | null
+          swap_dealer_short?: number | null
+          managed_money_long?: number | null
+          managed_money_short?: number | null
+          other_reportables_long?: number | null
+          other_reportables_short?: number | null
+          source?: string
+          note?: string | null
+        }>
       }
 
-      setHistory(result.data ?? [])
+      const mapped: CotData[] = (result.data ?? []).map((item) => ({
+        id: item.id,
+        symbol: item.symbol,
+        reportDate: item.report_date,
+        openInterest: item.open_interest ?? undefined,
+        producerLong: item.producer_long ?? undefined,
+        producerShort: item.producer_short ?? undefined,
+        swapDealerLong: item.swap_dealer_long ?? undefined,
+        swapDealerShort: item.swap_dealer_short ?? undefined,
+        managedMoneyLong: item.managed_money_long ?? undefined,
+        managedMoneyShort: item.managed_money_short ?? undefined,
+        otherReportablesLong:
+          item.other_reportables_long ?? undefined,
+        otherReportablesShort:
+          item.other_reportables_short ?? undefined,
+        source: item.source,
+        note: item.note ?? undefined,
+      }))
+
+      setHistory(mapped)
     } catch {
       setMessage('Unable to load COT history')
     }
