@@ -170,15 +170,8 @@ function getRiskPositionContext(
     readiness = "WATCH"
   }
 
-  let riskLevel = "NORMAL"
-
-  if (atrPercent >= 0.5) {
-    riskLevel = "HIGH"
-  } else if (atrPercent >= 0.3) {
-    riskLevel = "ELEVATED"
-  } else if (atrPercent < 0.15) {
-    riskLevel = "LOW"
-  }
+  // IQTF decision risk is authoritative for executive risk state.
+  const riskLevel = decision.risk
 
   const atrContext = `ATR ${atr.toFixed(2)} · ${atrPercent.toFixed(2)}%`
 
@@ -400,7 +393,8 @@ function getAlertContext(
   decision: ReturnType<typeof getDecision>,
   riskPosition: ReturnType<typeof getRiskPositionContext>,
   tradePlan: ReturnType<typeof getTradePlan>,
-  monitoring: ReturnType<typeof getMonitoringContext>
+  monitoring: ReturnType<typeof getMonitoringContext>,
+  iqtf: CmeAnalysis["iqtfDecision"] | null
 ) {
   if (!data) {
     return {
@@ -432,6 +426,20 @@ function getAlertContext(
     escalation = "RISK ESCALATION"
     reason = "Volatility has exceeded the defined high-risk threshold"
     action = "REDUCE EXPOSURE AND WAIT FOR STABILITY"
+  } else if (
+    iqtf?.tradePermission === "BLOCKED" ||
+    iqtf?.signalConflict === true ||
+    iqtf?.riskState === "HIGH"
+  ) {
+    level = "HIGH"
+    primary = iqtf?.signalConflict
+      ? "IQTF SIGNAL CONFLICT"
+      : "IQTF RISK GATE"
+    escalation = "RISK ESCALATION"
+    reason =
+      iqtf?.tradePermissionReason ??
+      "IQTF decision is blocked by risk or confirmation conditions"
+    action = "WAIT — NO DIRECTIONAL EXECUTION"
   } else if (
     riskPosition.readiness === "CONFIRMED" &&
     decision.risk === "HIGH"
@@ -540,7 +548,12 @@ if (alert.level === "HIGH") {
 } else if (iqtf?.decision === "NO_TRADE") {
   action = "WAIT"
   state = "NO TRADE"
-  priority = "LOW"
+  priority =
+    iqtf.riskState === "HIGH" ||
+    iqtf.signalConflict === true ||
+    iqtf.tradePermission === "BLOCKED"
+      ? "HIGH"
+      : "LOW"
   nextStep = "Wait for stronger directional evidence"
   constraint = "No directional execution"
   }
@@ -940,7 +953,8 @@ const iqtf = institutionalData?.iqtfDecision ?? null
     decision,
     riskPosition,
     tradePlan,
-    monitoring
+    monitoring,
+    iqtf
   )
 
   const alertColor =
@@ -2290,7 +2304,11 @@ const iqtf = institutionalData?.iqtfDecision ?? null
             </p>
 
             <p className="mt-2 text-sm font-bold text-zinc-300">
-              Conditional
+              {iqtf?.tradePermission === "BLOCKED" ||
+              iqtf?.signalConflict === true ||
+              iqtf?.riskState === "HIGH"
+                ? "BLOCKED"
+                : "CONDITIONAL"}
             </p>
           </div>
         </div>
