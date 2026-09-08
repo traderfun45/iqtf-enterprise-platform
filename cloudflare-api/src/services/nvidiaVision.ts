@@ -664,8 +664,19 @@ Never invent a value.`,
         return Number.isFinite(number) ? number : null
       }
 
+      type NumericCotField =
+        | 'total_oi'
+        | 'producer_long'
+        | 'producer_short'
+        | 'swap_dealer_long'
+        | 'swap_dealer_short'
+        | 'managed_money_long'
+        | 'managed_money_short'
+        | 'other_reportables_long'
+        | 'other_reportables_short'
+
       const fieldPatterns: Array<
-        [keyof NvidiaCotRecord, RegExp]
+        [NumericCotField, RegExp]
       > = [
         ['total_oi', /total\s*oi\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
         ['producer_long', /producer\s+long\s*:\s*([+-]?\d[\d,]*(?:\.\d+)?)/i],
