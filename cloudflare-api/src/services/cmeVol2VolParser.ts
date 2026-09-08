@@ -336,15 +336,15 @@ export function parseCmeVol2Vol(
   )
 
 const minus1Match = expectedRangeText.match(
-  /-1\s*[:\-]\s*([\d,.]+)/i,
+  /-1(?:\s+Standard\s+Deviation)?\s*[:\-]\s*([\d,.]+)/i,
 )
 
 const minus2Match = expectedRangeText.match(
-  /-2\s*[:\-]\s*([\d,.]+)/i,
+  /-2(?:\s+Standard\s+Deviation)?\s*[:\-]\s*([\d,.]+)/i,
 )
 
 const minus3Match = expectedRangeText.match(
-  /-3\s*[:\-]\s*([\d,.]+)/i,
+  /-3(?:\s+Standard\s+Deviation)?\s*[:\-]\s*([\d,.]+)/i,
 )
 
 if (

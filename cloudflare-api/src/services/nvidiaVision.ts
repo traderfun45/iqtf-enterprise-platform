@@ -3,6 +3,15 @@ export type NvidiaVisionResult = {
   view_type: string
   raw_text: string
   strike_levels: number[]
+  expected_range?: {
+    minus3?: number
+    minus2?: number
+    minus1?: number
+    atm?: number
+    plus1?: number
+    plus2?: number
+    plus3?: number
+  }
   unreadable_or_missing_information: string[]
 }
 
@@ -188,6 +197,26 @@ Only extract Expected Range values if they are explicitly visible in the ACTIVE 
 Do NOT create Expected Range values from the chart.
 Do NOT calculate ATM, +1, +2, +3, -1, -2, or -3.
 
+If the ACTIVE view explicitly shows labels such as:
+-3 Standard Deviation
+-2 Standard Deviation
+-1 Standard Deviation
+ATM
++1 Standard Deviation
++2 Standard Deviation
++3 Standard Deviation
+
+map their visible numeric values directly to:
+-3 -> minus3
+-2 -> minus2
+-1 -> minus1
+ATM -> atm
++1 -> plus1
++2 -> plus2
++3 -> plus3
+
+These values must come from visible text in the screenshot only.
+
 OUTPUT:
 Return ONLY valid JSON.
 No markdown.
@@ -201,6 +230,15 @@ Use exactly this structure:
   "view_type": "INTRADAY_VOLUME",
   "raw_text": "visible labels and numbers only",
   "strike_levels": [],
+  "expected_range": {
+    "minus3": null,
+    "minus2": null,
+    "minus1": null,
+    "atm": null,
+    "plus1": null,
+    "plus2": null,
+    "plus3": null
+  },
   "unreadable_or_missing_information": []
 }
 
@@ -377,6 +415,41 @@ Never invent a value.`,
                 Number.isFinite(value),
             )
         : [],
+
+    ...(result.expected_range !== undefined
+      ? {
+          expected_range: {
+            ...(typeof result.expected_range.minus3 === 'number' &&
+            Number.isFinite(result.expected_range.minus3)
+              ? { minus3: result.expected_range.minus3 }
+              : {}),
+            ...(typeof result.expected_range.minus2 === 'number' &&
+            Number.isFinite(result.expected_range.minus2)
+              ? { minus2: result.expected_range.minus2 }
+              : {}),
+            ...(typeof result.expected_range.minus1 === 'number' &&
+            Number.isFinite(result.expected_range.minus1)
+              ? { minus1: result.expected_range.minus1 }
+              : {}),
+            ...(typeof result.expected_range.atm === 'number' &&
+            Number.isFinite(result.expected_range.atm)
+              ? { atm: result.expected_range.atm }
+              : {}),
+            ...(typeof result.expected_range.plus1 === 'number' &&
+            Number.isFinite(result.expected_range.plus1)
+              ? { plus1: result.expected_range.plus1 }
+              : {}),
+            ...(typeof result.expected_range.plus2 === 'number' &&
+            Number.isFinite(result.expected_range.plus2)
+              ? { plus2: result.expected_range.plus2 }
+              : {}),
+            ...(typeof result.expected_range.plus3 === 'number' &&
+            Number.isFinite(result.expected_range.plus3)
+              ? { plus3: result.expected_range.plus3 }
+              : {}),
+          },
+        }
+      : {}),
 
     unreadable_or_missing_information:
       Array.isArray(
