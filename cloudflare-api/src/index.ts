@@ -1721,6 +1721,186 @@ if (
     }
 
     // =========================================================
+    // POST /api/cot/ocr/apply
+    // =========================================================
+    if (
+      url.pathname === '/api/cot/ocr/apply' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const body = await request.json() as {
+          symbol?: string
+          record?: {
+            report_date: string | null
+            total_oi: number | null
+            producer_long: number | null
+            producer_short: number | null
+            swap_dealer_long: number | null
+            swap_dealer_short: number | null
+            managed_money_long: number | null
+            managed_money_short: number | null
+            other_reportables_long: number | null
+            other_reportables_short: number | null
+          }
+          decision?: 'KEEP_DATABASE' | 'USE_OCR'
+          source?: string
+          note?: string
+        }
+
+        const symbol = body.symbol || 'GC'
+        const record = body.record
+
+        if (!record) {
+          return json({
+            success: false,
+            error: 'record is required',
+          }, 400)
+        }
+
+        const reportDate = normalizeCotDate(record.report_date)
+
+        if (!reportDate) {
+          return json({
+            success: false,
+            error: 'Invalid report_date',
+          }, 400)
+        }
+
+        const existing = await env.DB.prepare(`
+          SELECT *
+          FROM cot_market_data
+          WHERE symbol = ?
+            AND report_date = ?
+          ORDER BY id DESC
+          LIMIT 1
+        `)
+          .bind(symbol, reportDate)
+          .first()
+
+        if (existing && !body.decision) {
+          return json({
+            success: false,
+            error: 'Existing record requires decision',
+            status: 'CONFLICT',
+            data: existing,
+          }, 409)
+        }
+
+        if (
+          existing &&
+          body.decision === 'KEEP_DATABASE'
+        ) {
+          return json({
+            success: true,
+            action: 'KEEP_DATABASE',
+            data: existing,
+          })
+        }
+
+        if (
+          existing &&
+          body.decision === 'USE_OCR'
+        ) {
+          const result = await env.DB.prepare(`
+            UPDATE cot_market_data
+            SET
+              open_interest = ?,
+              producer_long = ?,
+              producer_short = ?,
+              swap_dealer_long = ?,
+              swap_dealer_short = ?,
+              managed_money_long = ?,
+              managed_money_short = ?,
+              other_reportables_long = ?,
+              other_reportables_short = ?,
+              source = ?,
+              note = ?,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            RETURNING *
+          `)
+            .bind(
+              record.total_oi,
+              record.producer_long,
+              record.producer_short,
+              record.swap_dealer_long,
+              record.swap_dealer_short,
+              record.managed_money_long,
+              record.managed_money_short,
+              record.other_reportables_long,
+              record.other_reportables_short,
+              body.source ?? 'CFTC-OCR',
+              body.note ?? null,
+              existing.id,
+            )
+            .first()
+
+          return json({
+            success: true,
+            action: 'USE_OCR',
+            data: result,
+          })
+        }
+
+        const result = await env.DB.prepare(`
+          INSERT INTO cot_market_data (
+            symbol,
+            report_date,
+            open_interest,
+            producer_long,
+            producer_short,
+            swap_dealer_long,
+            swap_dealer_short,
+            managed_money_long,
+            managed_money_short,
+            other_reportables_long,
+            other_reportables_short,
+            source,
+            note
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING *
+        `)
+          .bind(
+            symbol,
+            reportDate,
+            record.total_oi,
+            record.producer_long,
+            record.producer_short,
+            record.swap_dealer_long,
+            record.swap_dealer_short,
+            record.managed_money_long,
+            record.managed_money_short,
+            record.other_reportables_long,
+            record.other_reportables_short,
+            body.source ?? 'CFTC-OCR',
+            body.note ?? null,
+          )
+          .first()
+
+        return json({
+          success: true,
+          action: 'INSERT',
+          data: result,
+        }, 201)
+      } catch (error) {
+        console.error(
+          'POST /api/cot/ocr/apply error:',
+          error,
+        )
+
+        return json({
+          success: false,
+          error: 'Failed to apply COT OCR',
+          message:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        }, 500)
+      }
+    }
+
+    // =========================================================
     // GET /api/cot/latest
     // =========================================================
     if (
