@@ -296,6 +296,7 @@ export default function CotAdminPage() {
       const ocrResult = (await ocrResponse.json()) as {
         success?: boolean
         error?: string
+        message?: string
         data?: {
           records?: CotOcrRecord[]
         }
@@ -303,7 +304,8 @@ export default function CotAdminPage() {
 
       if (!ocrResponse.ok || !ocrResult.success) {
         throw new Error(
-          ocrResult.error ??
+          ocrResult.message ??
+            ocrResult.error ??
             'COT OCR failed',
         )
       }
