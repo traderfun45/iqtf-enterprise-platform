@@ -15,7 +15,10 @@ import { resolveVol2VolState } from './services/vol2volState.js'
 import { buildHistoricalChanges } from './services/institutional.js'
 import { calculateIqtfDecision } from './services/iqtfDecision.js'
 import { getVol2VolState, saveVol2VolState } from './db/vol2volState.js'
-import { validateCotRecord } from './services/cotOcrValidator.js'
+import {
+  normalizeCotDate,
+  validateCotRecord,
+} from './services/cotOcrValidator.js'
 
 export interface Env {
   DB: D1Database
@@ -1652,7 +1655,10 @@ if (
         const results = []
 
         for (const record of records) {
-          if (!record.report_date) {
+          const normalizedReportDate =
+            normalizeCotDate(record.report_date)
+
+          if (!normalizedReportDate) {
             results.push(
               validateCotRecord(record, null),
             )
@@ -1677,7 +1683,7 @@ if (
             ORDER BY id DESC
             LIMIT 1
           `)
-            .bind(symbol, record.report_date)
+            .bind(symbol, normalizedReportDate)
             .first()
 
           results.push(

@@ -46,11 +46,79 @@ const fields: CotValidationField[] = [
   'other_reportables_short',
 ]
 
+export function normalizeCotDate(
+  value: string | null,
+): string | undefined {
+  if (!value) return undefined
+
+  const isoMatch = value.trim().match(
+    /^(\d{4})-(\d{1,2})-(\d{1,2})$/,
+  )
+
+  if (isoMatch) {
+    const year = Number(isoMatch[1])
+    const month = Number(isoMatch[2])
+    const day = Number(isoMatch[3])
+
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(month) ||
+      !Number.isInteger(day) ||
+      month < 1 ||
+      month > 12 ||
+      day < 1 ||
+      day > 31
+    ) {
+      return undefined
+    }
+
+    return [
+      String(year).padStart(4, '0'),
+      String(month).padStart(2, '0'),
+      String(day).padStart(2, '0'),
+    ].join('-')
+  }
+
+  const match = value.trim().match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
+  )
+
+  if (!match) return undefined
+
+  const day = Number(match[1])
+  const month = Number(match[2])
+  let year = Number(match[3])
+
+  if (year >= 2400) {
+    year -= 543
+  }
+
+  if (
+    !Number.isInteger(day) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(year) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return undefined
+  }
+
+  return [
+    String(year).padStart(4, '0'),
+    String(month).padStart(2, '0'),
+    String(day).padStart(2, '0'),
+  ].join('-')
+}
+
 export function validateCotRecord(
   ocr: CotOcrRecord,
   database: Record<string, unknown> | null,
 ): CotValidationResult {
-  if (!ocr.report_date) {
+  const reportDate = normalizeCotDate(ocr.report_date)
+
+  if (!reportDate) {
     return {
       reportDate: null,
       status: 'INVALID',
@@ -60,7 +128,7 @@ export function validateCotRecord(
 
   if (!database) {
     return {
-      reportDate: ocr.report_date,
+      reportDate,
       status: 'NEW',
       conflicts: [],
     }
@@ -88,7 +156,7 @@ export function validateCotRecord(
   }
 
   return {
-    reportDate: ocr.report_date,
+    reportDate,
     status:
       conflicts.length > 0
         ? 'CONFLICT'
