@@ -223,19 +223,19 @@ async function handleScanImage() {
         current.settlementPrice,
 
       volume:
-        data.volume ?? current.volume,
+        data.volume,
 
       volumeZscore:
-        data.volumeZscore ?? current.volumeZscore,
+        data.volumeZscore,
 
       openInterest:
-        data.openInterest ?? current.openInterest,
+        data.openInterest,
 
       oiChange:
-        data.oiChange ?? current.oiChange,
+        data.oiChange,
 
       oiZscore:
-        data.oiZscore ?? current.oiZscore,
+        data.oiZscore,
 
       inputMethod: 'OCR',
       imageReference: selectedImage.name,
