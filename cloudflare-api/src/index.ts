@@ -634,26 +634,35 @@ export default {
           futuresQuote.price,
         )
 
-        const oneHour = calculateExpectedMove(
-          hourlyCandles,
-          '1H',
-          undefined,
-          spotQuote.price,
-        )
+        const oneHour = {
+          ...calculateExpectedMove(
+            hourlyCandles,
+            '1H',
+            undefined,
+            spotQuote.price,
+          ),
+          symbol: 'XAUUSD',
+        }
 
-        const fourHour = calculateExpectedMove(
-          hourlyCandles,
-          '4H',
-          undefined,
-          spotQuote.price,
-        )
+        const fourHour = {
+          ...calculateExpectedMove(
+            hourlyCandles,
+            '4H',
+            undefined,
+            spotQuote.price,
+          ),
+          symbol: 'XAUUSD',
+        }
 
-        const daily = calculateExpectedMove(
-          dailyCandles,
-          'D',
-          undefined,
-          spotQuote.price,
-        )
+        const daily = {
+          ...calculateExpectedMove(
+            dailyCandles,
+            'D',
+            undefined,
+            spotQuote.price,
+          ),
+          symbol: 'XAUUSD',
+        }
 
         return json({
           success: true,
