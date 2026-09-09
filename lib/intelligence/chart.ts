@@ -2,6 +2,10 @@ import type { Intelligence } from "@/lib/market"
 
 export type ChartPoint = {
   timestamp: string
+  open: number
+  high: number
+  low: number
+  close: number
   price: number
   ema50: number | null
   ema200: number | null
@@ -33,7 +37,13 @@ export function buildChartData(
   const candles = intelligence.candles
     .filter(
       (candle) =>
+        Number.isFinite(candle.open) &&
+        Number.isFinite(candle.high) &&
+        Number.isFinite(candle.low) &&
         Number.isFinite(candle.close) &&
+        candle.open > 0 &&
+        candle.high > 0 &&
+        candle.low > 0 &&
         candle.close > 0 &&
         typeof candle.timestamp === "string"
     )
@@ -54,6 +64,10 @@ export function buildChartData(
 
   return candles.map((candle, index) => ({
     timestamp: candle.timestamp,
+    open: candle.open,
+    high: candle.high,
+    low: candle.low,
+    close: candle.close,
     price: candle.close,
     ema50: ema50[index] ?? null,
     ema200: ema200[index] ?? null,
