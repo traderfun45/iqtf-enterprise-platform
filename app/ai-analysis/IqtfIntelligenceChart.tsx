@@ -267,7 +267,7 @@ export default function IqtfIntelligenceChart({
     )
   }, [item])
 
-  if (data.length === 0 || !item) {
+  if (data.length === 0) {
     return (
       <div className="flex min-h-[430px] items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950 text-sm text-zinc-500">
         Chart data unavailable
@@ -338,14 +338,14 @@ export default function IqtfIntelligenceChart({
         <span>
           HV14{" "}
           <strong className="text-zinc-300">
-            {item.hv14Percent.toFixed(2)}%
+            {item?.hv14Percent != null ? `${item.hv14Percent.toFixed(2)}%` : "—"}
           </strong>
         </span>
 
         <span>
           EM ±{" "}
           <strong className="text-zinc-300">
-            {item.expectedMove.toFixed(2)}
+            {item?.expectedMove != null ? item.expectedMove.toFixed(2) : "—"}
           </strong>
         </span>
       </div>
