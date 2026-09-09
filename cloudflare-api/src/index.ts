@@ -515,6 +515,181 @@ export default {
 }
 
     // =========================================================
+    // GET /api/market/expected-move-xauusd
+    // GC volatility + XAUUSD spot price anchor
+    // =========================================================
+    if (
+      url.pathname === '/api/market/expected-move-xauusd' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const spotMarket = await getMarketBySymbol(
+          env.DB,
+          'XAUUSD',
+        )
+
+        const futuresMarket = await getMarketBySymbol(
+          env.DB,
+          'GC',
+        )
+
+        if (!spotMarket || !futuresMarket) {
+          return json(
+            {
+              success: false,
+              error: 'Gold markets not found',
+              spot: 'XAUUSD',
+              futures: 'GC',
+            },
+            404,
+          )
+        }
+
+        const spotProvider = getMarketProvider(
+          spotMarket.provider,
+          env,
+        )
+
+        const futuresProvider = getMarketProvider(
+          futuresMarket.provider,
+          env,
+        )
+
+        if (
+          typeof futuresProvider.getHistory !== 'function'
+        ) {
+          return json(
+            {
+              success: false,
+              error: 'GC historical data is not supported',
+            },
+            501,
+          )
+        }
+
+        const [spotQuote, futuresQuote, hourlyCandles, dailyCandles] =
+          await Promise.all([
+            spotProvider.getQuote('XAUUSD'),
+            futuresProvider.getQuote('GC'),
+            futuresProvider.getHistory('GC', {
+              interval: '1h',
+              outputsize: 200,
+            }),
+            futuresProvider.getHistory('GC', {
+              interval: '1d',
+              outputsize: 100,
+            }),
+          ])
+
+        if (
+          !Number.isFinite(spotQuote.price) ||
+          spotQuote.price <= 0
+        ) {
+          return json(
+            {
+              success: false,
+              error: 'Invalid current XAUUSD quote',
+            },
+            502,
+          )
+        }
+
+        if (
+          !Number.isFinite(futuresQuote.price) ||
+          futuresQuote.price <= 0
+        ) {
+          return json(
+            {
+              success: false,
+              error: 'Invalid current GC quote',
+            },
+            502,
+          )
+        }
+
+        if (hourlyCandles.length < 15) {
+          return json(
+            {
+              success: false,
+              error: 'Insufficient GC hourly historical data',
+              candleCount: hourlyCandles.length,
+            },
+            502,
+          )
+        }
+
+        if (dailyCandles.length < 15) {
+          return json(
+            {
+              success: false,
+              error: 'Insufficient GC daily historical data',
+              candleCount: dailyCandles.length,
+            },
+            502,
+          )
+        }
+
+        const basis = calculateGoldBasis(
+          spotQuote.price,
+          futuresQuote.price,
+        )
+
+        const oneHour = calculateExpectedMove(
+          hourlyCandles,
+          '1H',
+          undefined,
+          spotQuote.price,
+        )
+
+        const fourHour = calculateExpectedMove(
+          hourlyCandles,
+          '4H',
+          undefined,
+          spotQuote.price,
+        )
+
+        const daily = calculateExpectedMove(
+          dailyCandles,
+          'D',
+          undefined,
+          spotQuote.price,
+        )
+
+        return json({
+          success: true,
+          symbol: 'XAUUSD',
+          anchor: {
+            symbol: 'XAUUSD',
+            price: spotQuote.price,
+            source: spotQuote.source,
+          },
+          volatilitySource: {
+            symbol: 'GC',
+            price: futuresQuote.price,
+            source: futuresQuote.source,
+          },
+          basis,
+          data: {
+            '1H': oneHour,
+            '4H': fourHour,
+            D: daily,
+          },
+          timestamp: new Date().toISOString(),
+        })
+      } catch (error) {
+        return json(
+          {
+            success: false,
+            error: 'XAUUSD Expected Move unavailable',
+            message:
+              error instanceof Error
+                ? error.message
+                : 'XAUUSD Expected Move calculation error',
+          },
+          502,
+        )
+      }
+    }
 
     // =========================================================
     // GET /api/market/gold-basis
