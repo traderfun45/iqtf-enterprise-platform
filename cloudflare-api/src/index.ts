@@ -9,6 +9,7 @@ import { listMarkets, getMarketBySymbol } from './market/markets.js'
 import { getMarketProvider } from './market/provider.js'
 import { calculateMarketIntelligence } from './services/market/intelligence.js'
 import { calculateExpectedMove } from './services/market/expectedMove.js'
+import { calculateGoldBasis } from './services/market/goldBasis.js'
 import { analyzeCmeIntelligence } from './services/cmeIntelligence.js'
 import { analyzeVol2Vol } from './services/vol2vol.js'
 import { analyzeCotIntelligence } from './services/cotIntelligence.js'
@@ -512,6 +513,76 @@ export default {
     )
   }
 }
+
+    // =========================================================
+
+    // =========================================================
+    // GET /api/market/gold-basis
+    // Compare XAUUSD Spot vs GC Futures
+    // =========================================================
+    if (
+      url.pathname === '/api/market/gold-basis' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const spotMarket = await getMarketBySymbol(env.DB, 'XAUUSD')
+        const futuresMarket = await getMarketBySymbol(env.DB, 'GC')
+
+        if (!spotMarket || !futuresMarket) {
+          return json(
+            {
+              success: false,
+              error: 'Gold markets not found',
+              spot: 'XAUUSD',
+              futures: 'GC',
+            },
+            404,
+          )
+        }
+
+        const spotProvider = getMarketProvider(
+          spotMarket.provider,
+          env,
+        )
+
+        const futuresProvider = getMarketProvider(
+          futuresMarket.provider,
+          env,
+        )
+
+        const [spotQuote, futuresQuote] = await Promise.all([
+          spotProvider.getQuote('XAUUSD'),
+          futuresProvider.getQuote('GC'),
+        ])
+
+        const basis = calculateGoldBasis(
+          spotQuote.price,
+          futuresQuote.price,
+        )
+
+        return json({
+          success: true,
+          source: {
+            spot: spotQuote.source,
+            futures: futuresQuote.source,
+          },
+          data: basis,
+          timestamp: new Date().toISOString(),
+        })
+      } catch (error) {
+        return json(
+          {
+            success: false,
+            error: 'Gold Basis unavailable',
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Gold Basis calculation error',
+          },
+          502,
+        )
+      }
+    }
 
     // =========================================================
 
