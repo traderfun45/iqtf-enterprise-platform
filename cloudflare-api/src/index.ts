@@ -808,8 +808,7 @@ if (
             volatility_settlement:
               parsedVol2Vol.volatilitySettlement,
 
-            expectedRange:
-              parsedVol2Vol.expectedRange,
+            expectedRange: visionResult.expected_range ?? parsedVol2Vol.expectedRange,
 
             call_volume:
               parsedVol2Vol.callVolume,
