@@ -818,11 +818,13 @@ const [
         intelligenceResult,
         cmeResult,
         institutionalResult,
+        expectedMoveResult,
       ] = await Promise.allSettled([
         getMarketQuote("XAUUSD"),
         getMarketIntelligence("XAUUSD", "1h", 50),
         getCmeAnalysis("GC"),
         getInstitutionalAnalysis("GC"),
+        getExpectedMoveXauUsd("XAUUSD"),
       ])
 
       if (quoteResult.status === "fulfilled") {
@@ -845,6 +847,12 @@ const [
         setInstitutionalData(institutionalResult.value)
       } else {
         setInstitutionalData(null)
+      }
+
+      if (expectedMoveResult.status === "fulfilled") {
+        setExpectedMoveData(expectedMoveResult.value)
+      } else {
+        setExpectedMoveData(null)
       }
 
       } catch (err) {
