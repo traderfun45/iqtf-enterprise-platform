@@ -412,3 +412,68 @@ export async function getMarketQuote(
 
   return response.quote
 }
+
+export type ExpectedMoveTimeframe = "1H" | "4H" | "D"
+
+export type ExpectedMoveLevels = {
+  minus3: number
+  minus2: number
+  minus1: number
+  atm: number
+  plus1: number
+  plus2: number
+  plus3: number
+}
+
+export type ExpectedMoveData = {
+  symbol: string
+  timeframe: ExpectedMoveTimeframe
+  price: number
+  hv14: number
+  hv14Percent: number
+  expectedMove: number
+  expectedMovePercent: number
+  timeFractionYears: number
+  levels: ExpectedMoveLevels
+  sampleSize: number
+  timestamp: string
+}
+
+export type ExpectedMoveXauUsd = {
+  success: boolean
+  symbol: "XAUUSD"
+  anchor: {
+    symbol: "XAUUSD"
+    price: number
+    source: string
+  }
+  volatilitySource: {
+    symbol: "GC"
+    price: number
+    source: string
+  }
+  basis: {
+    spotSymbol: "XAUUSD"
+    futuresSymbol: "GC"
+    spotPrice: number
+    futuresPrice: number
+    basis: number
+    basisPercent: number
+    timestamp: string
+  }
+  data: {
+    "1H": ExpectedMoveData
+    "4H": ExpectedMoveData
+    D: ExpectedMoveData
+  }
+  timestamp: string
+}
+
+export async function getExpectedMoveXauUsd(
+  symbol = "XAUUSD"
+): Promise<ExpectedMoveXauUsd> {
+  return apiGet<ExpectedMoveXauUsd>(
+    `/api/market/expected-move-xauusd?symbol=${encodeURIComponent(symbol)}`,
+    15000
+  )
+}

@@ -16,7 +16,9 @@ import {
   getMarketQuote,
   getCmeAnalysis,
   getInstitutionalAnalysis,
+  getExpectedMoveXauUsd,
   type Intelligence,
+  type ExpectedMoveXauUsd,
   type CmeAnalysis,
   type InstitutionalAnalysis,
   type Quote,
@@ -794,6 +796,8 @@ const [quote, setQuote] = useState<Quote | null>(null)
 const [cmeData, setCmeData] = useState<CmeAnalysis | null>(null)
 const [institutionalData, setInstitutionalData] =
   useState<InstitutionalAnalysis | null>(null)
+const [expectedMoveData, setExpectedMoveData] =
+  useState<ExpectedMoveXauUsd | null>(null)
 const [loading, setLoading] = useState(true)
 const [refreshing, setRefreshing] = useState(false)
 const [error, setError] = useState<string | null>(null)
@@ -1114,6 +1118,110 @@ const iqtf = institutionalData?.iqtfDecision ?? null
           <p className={`mt-2 text-2xl font-bold ${signalColor}`}>
             {data ? formatScore(data.trend.score) : "—"}
           </p>
+        </div>
+      </div>
+
+      {/* Expected Move */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Expected Move
+            </h2>
+            <p className="text-xs text-zinc-500">
+              XAUUSD spot anchor · GC futures volatility reference
+            </p>
+          </div>
+
+          <div className="text-right">
+            <p className="text-xs text-zinc-500">ATM / Spot</p>
+            <p className="text-xl font-bold text-white">
+              {expectedMoveData
+                ? expectedMoveData.anchor.price.toFixed(2)
+                : "—"}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          {(["1H", "4H", "D"] as const).map((timeframe) => {
+            const item = expectedMoveData?.data[timeframe]
+
+            return (
+              <div
+                key={timeframe}
+                className="rounded-lg bg-zinc-900 p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-zinc-300">
+                    {timeframe}
+                  </p>
+
+                  <p className="text-xs text-zinc-500">
+                    HV14 {item ? item.hv14Percent.toFixed(2) : "—"}%
+                  </p>
+                </div>
+
+                <p className="mt-3 text-2xl font-bold text-white">
+                  ±{item ? item.expectedMove.toFixed(2) : "—"}
+                </p>
+
+                <p className="mt-1 text-xs text-zinc-500">
+                  EM {item ? item.expectedMovePercent.toFixed(2) : "—"}%
+                </p>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-zinc-500">−1 SD</span>
+                    <p className="font-medium text-zinc-300">
+                      {item ? item.levels.minus1.toFixed(2) : "—"}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-zinc-500">+1 SD</span>
+                    <p className="font-medium text-zinc-300">
+                      {item ? item.levels.plus1.toFixed(2) : "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">Spot XAUUSD</p>
+            <p className="mt-1 font-semibold text-white">
+              {expectedMoveData
+                ? expectedMoveData.anchor.price.toFixed(2)
+                : "—"}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">GC Futures</p>
+            <p className="mt-1 font-semibold text-white">
+              {expectedMoveData
+                ? expectedMoveData.volatilitySource.price.toFixed(2)
+                : "—"}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500">Basis</p>
+            <p className="mt-1 font-semibold text-white">
+              {expectedMoveData
+                ? `${expectedMoveData.basis.basis >= 0 ? "+" : ""}${expectedMoveData.basis.basis.toFixed(2)}`
+                : "—"}
+            </p>
+            <p className="text-xs text-zinc-500">
+              {expectedMoveData
+                ? `${expectedMoveData.basis.basisPercent >= 0 ? "+" : ""}${expectedMoveData.basis.basisPercent.toFixed(2)}%`
+                : "—"}
+            </p>
+          </div>
         </div>
       </div>
 
