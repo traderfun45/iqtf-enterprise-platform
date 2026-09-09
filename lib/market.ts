@@ -67,6 +67,16 @@ export type Intelligence = {
   timestamp: string
   interval: string
   candleCount: number
+  candles: Array<{
+    symbol: string
+    interval: string
+    timestamp: string
+    open: number
+    high: number
+    low: number
+    close: number
+    volume?: number
+  }>
 }
 
 export async function getMarketSnapshot(): Promise<MarketSnapshot> {

@@ -348,12 +348,13 @@ export default {
           )
         }
 
-        const intelligence = calculateMarketIntelligence(candles)
+        const intelligence = calculateMarketIntelligence(candles.slice(-50))
 
         return json({
           ...intelligence,
           interval,
           candleCount: candles.length,
+          candles,
         })
       } catch (error) {
         return json(

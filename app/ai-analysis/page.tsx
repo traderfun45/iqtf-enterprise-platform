@@ -27,6 +27,8 @@ import {
   buildIntelligenceDecision,
   type IntelligenceDecision,
 } from "@/lib/intelligence/decision"
+import { buildChartData } from "@/lib/intelligence/chart"
+import IqtfIntelligenceChart from "./IqtfIntelligenceChart"
 
 function formatScore(value: number) {
   return value.toFixed(3)
@@ -800,6 +802,8 @@ const [expectedMoveData, setExpectedMoveData] =
   useState<ExpectedMoveXauUsd | null>(null)
 const [loading, setLoading] = useState(true)
 const [refreshing, setRefreshing] = useState(false)
+
+const chartData = buildChartData(data)
 const [error, setError] = useState<string | null>(null)
 
 
@@ -821,7 +825,7 @@ const [
         expectedMoveResult,
       ] = await Promise.allSettled([
         getMarketQuote("XAUUSD"),
-        getMarketIntelligence("XAUUSD", "1h", 50),
+        getMarketIntelligence("XAUUSD", "1h", 250),
         getCmeAnalysis("GC"),
         getInstitutionalAnalysis("GC"),
         getExpectedMoveXauUsd("XAUUSD"),
@@ -1325,15 +1329,10 @@ const iqtf = institutionalData?.iqtfDecision ?? null
           </div>
         </div>
        
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
-  <p className="text-xs text-zinc-500">XAUUSD PRICE</p>
-  <p className="mt-2 text-3xl font-bold text-white">
-    {quote ? quote.price.toFixed(2) : "—"}
-  </p>
-  <p className="mt-1 text-xs text-zinc-500">
-    {quote?.source ?? "LIVE MARKET"}
-  </p>
-</div>
+      <IqtfIntelligenceChart
+        data={chartData}
+        expectedMoveData={expectedMoveData}
+      />
 
         {/* Signal */}
         <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
