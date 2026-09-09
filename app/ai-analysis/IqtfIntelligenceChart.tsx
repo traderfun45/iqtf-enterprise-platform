@@ -47,6 +47,7 @@ export default function IqtfIntelligenceChart({
   >([])
 
   const [timeframe, setTimeframe] = useState<Timeframe>("1H")
+  const [fullscreen, setFullscreen] = useState(false)
 
   const item = expectedMoveData?.data[timeframe] ?? null
 
@@ -59,7 +60,12 @@ export default function IqtfIntelligenceChart({
 
     const chart = createChart(container, {
       width: container.clientWidth,
-      height: 430,
+      height: Math.max(
+        300,
+        fullscreen
+          ? container.clientHeight
+          : 430
+      ),
 
       layout: {
         background: {
@@ -175,6 +181,9 @@ export default function IqtfIntelligenceChart({
 
       chartRef.current.applyOptions({
         width: containerRef.current.clientWidth,
+        height: fullscreen
+          ? Math.max(300, containerRef.current.clientHeight)
+          : 430,
       })
     })
 
@@ -188,7 +197,7 @@ export default function IqtfIntelligenceChart({
       ema50SeriesRef.current = null
       ema200SeriesRef.current = null
     }
-  }, [data])
+  }, [data, fullscreen])
 
   useEffect(() => {
     const series = candleSeriesRef.current
@@ -278,7 +287,13 @@ export default function IqtfIntelligenceChart({
   const latest = data[data.length - 1]
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5">
+    <div
+      className={
+        fullscreen
+          ? "fixed inset-0 z-50 flex h-[100dvh] w-screen flex-col bg-zinc-950 p-3"
+          : "rounded-xl border border-zinc-800 bg-zinc-950 p-5"
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-white">
@@ -290,8 +305,9 @@ export default function IqtfIntelligenceChart({
           </p>
         </div>
 
-        <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-1">
-          {(["1H", "4H", "D"] as const).map((value) => (
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+            {(["1H", "4H", "D"] as const).map((value) => (
             <button
               key={value}
               type="button"
@@ -304,13 +320,27 @@ export default function IqtfIntelligenceChart({
             >
               {value}
             </button>
-          ))}
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setFullscreen((value) => !value)}
+            className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white"
+            aria-label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          >
+            {fullscreen ? "✕" : "⛶"}
+          </button>
         </div>
       </div>
 
       <div
         ref={containerRef}
-        className="mt-4 overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
+        className={
+          fullscreen
+            ? "mt-2 min-h-0 flex-1 overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
+            : "mt-4 overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
+        }
       />
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-zinc-500">
