@@ -8,6 +8,7 @@ import { verifyPassword } from './services/password.js'
 import { listMarkets, getMarketBySymbol } from './market/markets.js'
 import { getMarketProvider } from './market/provider.js'
 import { calculateMarketIntelligence } from './services/market/intelligence.js'
+import { calculateExpectedMove } from './services/market/expectedMove.js'
 import { analyzeCmeIntelligence } from './services/cmeIntelligence.js'
 import { analyzeVol2Vol } from './services/vol2vol.js'
 import { analyzeCotIntelligence } from './services/cotIntelligence.js'
@@ -365,7 +366,156 @@ export default {
       }
     }
 
-    // GET /api/market/quote?symbol=XAUUSD
+    // GET /api/market/expected-move?symbol=GC
+    // Calculate Yahoo GC=F Expected Move for 1H / 4H / D
+    // =========================================================
+    if (
+      url.pathname === '/api/market/expected-move' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const symbol = (url.searchParams.get('symbol') || 'GC')
+          .trim()
+          .toUpperCase()
+
+        if (symbol !== 'GC') {
+          return json(
+            {
+              success: false,
+              error: 'Expected Move currently supports GC only',
+              symbol,
+            },
+            400,
+          )
+        }
+
+        const market = await getMarketBySymbol(env.DB, symbol)
+
+        if (!market) {
+          return json(
+            {
+              success: false,
+              error: 'Market not found',
+              symbol,
+            },
+            404,
+          )
+        }
+
+        const provider = getMarketProvider(market.provider, env)
+
+        if (typeof provider.getHistory !== 'function') {
+          return json(
+            {
+              success: false,
+              error: 'Historical data is not supported by this provider',
+              symbol,
+              provider: market.provider ?? 'unknown',
+            },
+            501,
+          )
+        }
+
+        const quote = await provider.getQuote(symbol)
+
+        if (
+          !Number.isFinite(quote.price) ||
+          quote.price <= 0
+        ) {
+          return json(
+            {
+              success: false,
+              error: 'Invalid current GC quote',
+              symbol,
+            },
+            502,
+          )
+        }
+
+        const candles = await provider.getHistory(symbol, {
+          interval: '1h',
+          outputsize: 200,
+        })
+
+        if (candles.length < 15) {
+          return json(
+            {
+              success: false,
+              error: 'Insufficient GC historical data',
+              symbol,
+              candleCount: candles.length,
+            },
+            502,
+          )
+        }
+
+        const oneHour = calculateExpectedMove(
+          candles,
+          '1H',
+          undefined,
+          quote.price,
+        )
+
+        const fourHour = calculateExpectedMove(
+          candles,
+          '4H',
+          undefined,
+          quote.price,
+        )
+
+        const dailyCandles = await provider.getHistory(symbol, {
+          interval: '1d',
+          outputsize: 100,
+        })
+
+        if (dailyCandles.length < 15) {
+          return json(
+            {
+              success: false,
+              error: 'Insufficient GC daily historical data',
+              symbol,
+              candleCount: dailyCandles.length,
+            },
+            502,
+          )
+        }
+
+        const daily = calculateExpectedMove(
+          dailyCandles,
+          'D',
+          undefined,
+          quote.price,
+        )
+
+        return json({
+          success: true,
+          symbol,
+          source: 'yahoo',
+          data: {
+            '1H': oneHour,
+            '4H': fourHour,
+            D: daily,
+          },
+          timestamp: new Date().toISOString(),
+        })
+      } catch (error) {
+        return json(
+          {
+            success: false,
+            error: 'Expected Move unavailable',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Expected Move calculation error',
+      },
+      502,
+    )
+  }
+}
+
+    // =========================================================
+
+// GET /api/market/quote?symbol=XAUUSD
     // Get current market quote through the configured provider
     // =========================================================
     if (url.pathname === '/api/market/quote' && request.method === 'GET') {
