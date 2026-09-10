@@ -1090,7 +1090,7 @@ const iqtf = institutionalData?.iqtfDecision ?? null
         <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
           {error}
           <p className="mt-1 text-xs text-zinc-500">
-            Make sure iqtf-enterprise API is running on port 4000.
+            Unable to load IQTF API data. Please check API connectivity.
           </p>
         </div>
       )}
