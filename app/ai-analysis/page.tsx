@@ -828,7 +828,7 @@ const [
         expectedMoveResult,
       ] = await Promise.allSettled([
         getMarketQuote("XAUUSD"),
-        getMarketIntelligence("XAUUSD", { "5m": "5m", "15m": "15m", "1H": "1h", "4H": "4h", "D": "1d" }[timeframe], 250),
+        getMarketIntelligence("XAUUSD", { "5m": "5m", "15m": "15m", "1H": "1h", "4H": "4h", "D": "1d" }[timeframe], 100),
         getCmeAnalysis("GC"),
         getInstitutionalAnalysis("GC"),
         getExpectedMoveXauUsd("XAUUSD"),
