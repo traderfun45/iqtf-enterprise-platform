@@ -1811,48 +1811,6 @@ const iqtf = institutionalData?.iqtfDecision ?? null
           )}
         </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
-            <p className="text-xs text-zinc-500">
-              Trigger
-            </p>
-
-            <p className="mt-2 text-sm font-medium text-zinc-300">
-              {tradePlan.trigger}
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
-            <p className="text-xs text-zinc-500">
-              Invalidation
-            </p>
-
-            <p className="mt-2 text-sm font-medium text-zinc-300">
-              {tradePlan.invalidation}
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
-            <p className="text-xs text-zinc-500">
-              Initial Objective
-            </p>
-
-            <p className="mt-2 text-sm font-medium text-zinc-300">
-              {tradePlan.target}
-            </p>
-          </div>
-        </div>
-
-        {data && (
-          <div className="mt-4 rounded-lg border border-sky-500/10 bg-sky-500/[0.03] p-4 text-sm text-zinc-400">
-            <span className="font-semibold text-white">
-              Plan logic:
-            </span>{" "}
-            The plan remains conditional and follows the current
-            intelligence, confirmation state, and volatility regime.
-          </div>
-        )}
-      </div>
 
       {/* Signal Confidence & Decision Quality */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
