@@ -8,7 +8,7 @@ import { verifyPassword } from './services/password.js'
 import { listMarkets, getMarketBySymbol } from './market/markets.js'
 import { getMarketProvider } from './market/provider.js'
 import { calculateMarketIntelligence } from './services/market/intelligence.js'
-import { calculateExpectedMove } from './services/market/expectedMove.js'
+import { calculateExpectedMove, aggregate4H } from './services/market/expectedMove.js'
 import { calculateGoldBasis } from './services/market/goldBasis.js'
 import { analyzeCmeIntelligence } from './services/cmeIntelligence.js'
 import { analyzeVol2Vol } from './services/vol2vol.js'
@@ -336,10 +336,20 @@ export default {
           )
         }
 
-        const candles = await provider.getHistory(symbol, {
-          interval,
-          outputsize,
-        })
+        const requestedInterval = interval.toLowerCase()
+
+        const candles =
+          requestedInterval === '4h'
+            ? aggregate4H(
+                await provider.getHistory(symbol, {
+                  interval: '1h',
+                  outputsize: Math.min(outputsize * 4 + 8, 5000),
+                }),
+              ).slice(-outputsize)
+            : await provider.getHistory(symbol, {
+                interval: requestedInterval,
+                outputsize,
+              })
 
         if (candles.length === 0) {
           return json(
@@ -352,7 +362,7 @@ export default {
 
         return json({
           ...intelligence,
-          interval,
+          interval: requestedInterval,
           candleCount: candles.length,
           candles,
         })
@@ -568,19 +578,33 @@ export default {
           )
         }
 
-        const [spotQuote, futuresQuote, hourlyCandles, dailyCandles] =
-          await Promise.all([
-            spotProvider.getQuote('XAUUSD'),
-            futuresProvider.getQuote('GC'),
-            futuresProvider.getHistory('GC', {
-              interval: '1h',
-              outputsize: 200,
-            }),
-            futuresProvider.getHistory('GC', {
-              interval: '1d',
-              outputsize: 100,
-            }),
-          ])
+        const [
+          spotQuote,
+          futuresQuote,
+          fiveMinuteCandles,
+          fifteenMinuteCandles,
+          hourlyCandles,
+          dailyCandles,
+        ] = await Promise.all([
+          spotProvider.getQuote('XAUUSD'),
+          futuresProvider.getQuote('GC'),
+          futuresProvider.getHistory('GC', {
+            interval: '5m',
+            outputsize: 200,
+          }),
+          futuresProvider.getHistory('GC', {
+            interval: '15m',
+            outputsize: 200,
+          }),
+          futuresProvider.getHistory('GC', {
+            interval: '1h',
+            outputsize: 200,
+          }),
+          futuresProvider.getHistory('GC', {
+            interval: '1d',
+            outputsize: 100,
+          }),
+        ])
 
         if (
           !Number.isFinite(spotQuote.price) ||
@@ -603,6 +627,28 @@ export default {
             {
               success: false,
               error: 'Invalid current GC quote',
+            },
+            502,
+          )
+        }
+
+        if (fiveMinuteCandles.length < 15) {
+          return json(
+            {
+              success: false,
+              error: 'Insufficient GC 5m historical data',
+              candleCount: fiveMinuteCandles.length,
+            },
+            502,
+          )
+        }
+
+        if (fifteenMinuteCandles.length < 15) {
+          return json(
+            {
+              success: false,
+              error: 'Insufficient GC 15m historical data',
+              candleCount: fifteenMinuteCandles.length,
             },
             502,
           )
@@ -634,6 +680,26 @@ export default {
           spotQuote.price,
           futuresQuote.price,
         )
+
+        const fiveMinute = {
+          ...calculateExpectedMove(
+            fiveMinuteCandles,
+            '5m',
+            undefined,
+            spotQuote.price,
+          ),
+          symbol: 'XAUUSD',
+        }
+
+        const fifteenMinute = {
+          ...calculateExpectedMove(
+            fifteenMinuteCandles,
+            '15m',
+            undefined,
+            spotQuote.price,
+          ),
+          symbol: 'XAUUSD',
+        }
 
         const oneHour = {
           ...calculateExpectedMove(
@@ -678,8 +744,9 @@ export default {
             price: futuresQuote.price,
             source: futuresQuote.source,
           },
-          basis,
           data: {
+            '5m': fiveMinute,
+            '15m': fifteenMinute,
             '1H': oneHour,
             '4H': fourHour,
             D: daily,

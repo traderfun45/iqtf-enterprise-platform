@@ -13,12 +13,14 @@ import {
 import type { ExpectedMoveXauUsd } from "@/lib/market"
 import type { ChartPoint } from "@/lib/intelligence/chart"
 
+type Timeframe = "5m" | "15m" | "1H" | "4H" | "D"
+
 type Props = {
   data: ChartPoint[]
   expectedMoveData: ExpectedMoveXauUsd | null
+  timeframe: Timeframe
+  onTimeframeChange: (timeframe: Timeframe) => void
 }
-
-type Timeframe = "1H" | "4H" | "D"
 
 function toTime(timestamp: string): Time {
   return Math.floor(new Date(timestamp).getTime() / 1000) as Time
@@ -27,6 +29,8 @@ function toTime(timestamp: string): Time {
 export default function IqtfIntelligenceChart({
   data,
   expectedMoveData,
+  timeframe,
+  onTimeframeChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -46,7 +50,6 @@ export default function IqtfIntelligenceChart({
     >[]
   >([])
 
-  const [timeframe, setTimeframe] = useState<Timeframe>("1H")
   const [fullscreen, setFullscreen] = useState(false)
 
   const item = expectedMoveData?.data[timeframe] ?? null
@@ -307,11 +310,11 @@ export default function IqtfIntelligenceChart({
 
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-1">
-            {(["1H", "4H", "D"] as const).map((value) => (
+            {(["5m", "15m", "1H", "4H", "D"] as const).map((value) => (
             <button
               key={value}
               type="button"
-              onClick={() => setTimeframe(value)}
+              onClick={() => onTimeframeChange(value)}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 timeframe === value
                   ? "bg-zinc-700 text-white"

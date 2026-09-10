@@ -472,6 +472,8 @@ export type ExpectedMoveXauUsd = {
     timestamp: string
   }
   data: {
+    "5m": ExpectedMoveData
+    "15m": ExpectedMoveData
     "1H": ExpectedMoveData
     "4H": ExpectedMoveData
     D: ExpectedMoveData

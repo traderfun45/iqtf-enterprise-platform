@@ -793,6 +793,9 @@ if (alert.level === "HIGH") {
 
 export default function AIAnalysisPage() {
 
+type AnalysisTimeframe = "5m" | "15m" | "1H" | "4H" | "D"
+
+const [timeframe, setTimeframe] = useState<AnalysisTimeframe>("1H")
 const [data, setData] = useState<Intelligence | null>(null)
 const [quote, setQuote] = useState<Quote | null>(null)
 const [cmeData, setCmeData] = useState<CmeAnalysis | null>(null)
@@ -825,7 +828,7 @@ const [
         expectedMoveResult,
       ] = await Promise.allSettled([
         getMarketQuote("XAUUSD"),
-        getMarketIntelligence("XAUUSD", "1h", 250),
+        getMarketIntelligence("XAUUSD", { "5m": "5m", "15m": "15m", "1H": "1h", "4H": "4h", "D": "1d" }[timeframe], 250),
         getCmeAnalysis("GC"),
         getInstitutionalAnalysis("GC"),
         getExpectedMoveXauUsd("XAUUSD"),
@@ -876,13 +879,15 @@ const [
 
   useEffect(() => {
     loadIntelligence(true)
+  }, [timeframe])
 
+  useEffect(() => {
     const timer = setInterval(() => {
       loadIntelligence(false)
     }, 30000)
 
     return () => clearInterval(timer)
-  }, [])
+  }, [timeframe])
 
   const signal = data?.signal ?? "neutral"
   const isBullish = signal === "bullish"
@@ -1332,6 +1337,8 @@ const iqtf = institutionalData?.iqtfDecision ?? null
       <IqtfIntelligenceChart
         data={chartData}
         expectedMoveData={expectedMoveData}
+        timeframe={timeframe}
+        onTimeframeChange={setTimeframe}
       />
 
         {/* Signal */}

@@ -1,6 +1,6 @@
 import type { MarketCandle } from '../../market/twelveData.js'
 
-export type ExpectedMoveTimeframe = '1H' | '4H' | 'D'
+export type ExpectedMoveTimeframe = '5m' | '15m' | '1H' | '4H' | 'D'
 
 export type ExpectedMoveLevels = {
   minus3: number
@@ -132,14 +132,18 @@ function sampleStandardDeviation(values: number[]): number {
 function annualizationFactor(
   timeframe: ExpectedMoveTimeframe,
 ): number {
+  if (timeframe === '5m') {
+    return Math.sqrt(288 * 365)
+  }
+  if (timeframe === '15m') {
+    return Math.sqrt(96 * 365)
+  }
   if (timeframe === '1H') {
     return Math.sqrt(24 * 365)
   }
-
   if (timeframe === '4H') {
     return Math.sqrt(6 * 365)
   }
-
   return Math.sqrt(365)
 }
 
@@ -147,8 +151,9 @@ function normalizeTimeframe(
   timeframe: string,
 ): ExpectedMoveTimeframe {
   const normalized = timeframe.toUpperCase()
-
   if (
+    normalized !== '5M' &&
+    normalized !== '15M' &&
     normalized !== '1H' &&
     normalized !== '4H' &&
     normalized !== 'D'
@@ -156,7 +161,11 @@ function normalizeTimeframe(
     throw new Error(`Unsupported Expected Move timeframe: ${timeframe}`)
   }
 
-  return normalized
+  return normalized === '5M'
+    ? '5m'
+    : normalized === '15M'
+      ? '15m'
+      : normalized as ExpectedMoveTimeframe
 }
 
 export function calculateExpectedMove(
@@ -216,11 +225,15 @@ export function calculateExpectedMove(
    * session / DTE fraction when that information is available.
    */
   const defaultTimeFraction =
-    normalizedTimeframe === '1H'
-      ? 1 / (24 * 365)
-      : normalizedTimeframe === '4H'
-        ? 4 / (24 * 365)
-        : 1 / 365
+    normalizedTimeframe === '5m'
+      ? 5 / (24 * 60 * 365)
+      : normalizedTimeframe === '15m'
+        ? 15 / (24 * 60 * 365)
+        : normalizedTimeframe === '1H'
+          ? 1 / (24 * 365)
+          : normalizedTimeframe === '4H'
+            ? 4 / (24 * 365)
+            : 1 / 365
 
   const timeFraction =
     typeof timeFractionYears === 'number' &&
