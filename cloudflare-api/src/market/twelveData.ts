@@ -23,6 +23,12 @@ export interface MarketHistoryParams {
   endDate?: string
 }
 
+const quoteCache = new Map<string, { data: MarketQuote; expiresAt: number }>()
+const historyCache = new Map<string, { data: MarketCandle[]; expiresAt: number }>()
+
+const QUOTE_CACHE_TTL = 20_000
+const HISTORY_CACHE_TTL = 60_000
+
 function mapSymbol(symbol: string): string {
   const normalized = symbol.toUpperCase().replace(/\s+/g, '')
 
@@ -75,12 +81,19 @@ export class TwelveDataMarketProvider {
         throw new Error('Invalid price returned by Twelve Data')
       }
 
-      return {
+      const result = {
         symbol: symbol.toUpperCase(),
         price,
         source: 'twelvedata',
         timestamp: new Date().toISOString(),
       }
+
+      quoteCache.set(providerSymbol, {
+        data: result,
+        expiresAt: Date.now() + QUOTE_CACHE_TTL,
+      })
+
+      return result
     } finally {
       clearTimeout(timeout)
     }
@@ -98,6 +111,13 @@ export class TwelveDataMarketProvider {
       Math.max(params.outputsize ?? 100, 1),
       5000,
     )
+
+    const cacheKey = `${providerSymbol}:${interval}:${outputsize}:${params.startDate ?? ''}:${params.endDate ?? ''}`
+    const cached = historyCache.get(cacheKey)
+
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data
+    }
 
     const query = new URLSearchParams({
       symbol: providerSymbol,
@@ -148,7 +168,7 @@ export class TwelveDataMarketProvider {
         )
       }
 
-      return data.values
+      const result = data.values
         .map((item) => {
           const open = Number(item.open)
           const high = Number(item.high)
@@ -184,6 +204,13 @@ export class TwelveDataMarketProvider {
         .filter(
           (item): item is MarketCandle => item !== null,
         )
+
+      historyCache.set(cacheKey, {
+        data: result,
+        expiresAt: Date.now() + HISTORY_CACHE_TTL,
+      })
+
+      return result
     } finally {
       clearTimeout(timeout)
     }
