@@ -48,6 +48,11 @@ export class TwelveDataMarketProvider {
   async getQuote(symbol: string): Promise<MarketQuote> {
     const providerSymbol = mapSymbol(symbol)
 
+    const cached = quoteCache.get(providerSymbol)
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data
+    }
+
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10000)
 
