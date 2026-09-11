@@ -93,3 +93,42 @@ export async function apiPost<T>(
     clearTimeout(timeout)
   }
 }
+
+export async function getExpectedMoveXauUsd() {
+  return apiGet<{
+    success: boolean
+    symbol: string
+    anchor: {
+      symbol: string
+      price: number
+      source: string
+    }
+    volatilitySource: {
+      symbol: string
+      price: number
+      source: string
+    }
+    data: Record<string, {
+      symbol: string
+      timeframe: string
+      price: number
+      hv14: number
+      hv14Percent: number
+      expectedMove: number
+      expectedMovePercent: number
+      timeFractionYears: number
+      levels: {
+        minus3: number
+        minus2: number
+        minus1: number
+        atm: number
+        plus1: number
+        plus2: number
+        plus3: number
+      }
+      sampleSize: number
+      timestamp: string
+    }>
+    timestamp: string
+  }>('/api/market/expected-move-xauusd')
+}
