@@ -128,6 +128,7 @@ function cmeZScore(
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const marketCache = await caches.open('iqtf-market')
     const url = new URL(request.url)
 
     if (request.method === 'OPTIONS') {
@@ -267,7 +268,7 @@ export default {
         const markets = await listMarkets(env.DB)
         const quotes = await Promise.all(
           markets.map(async (market) => {
-            const provider = getMarketProvider(market.provider, env)
+            const provider = getMarketProvider(market.provider, env, marketCache)
             return provider.getQuote(market.symbol)
           }),
         )
@@ -322,7 +323,7 @@ export default {
           )
         }
 
-        const provider = getMarketProvider(market.provider, env)
+        const provider = getMarketProvider(market.provider, env, marketCache)
 
         if (typeof provider.getHistory !== 'function') {
           return json(
@@ -414,7 +415,7 @@ export default {
           )
         }
 
-        const provider = getMarketProvider(market.provider, env)
+        const provider = getMarketProvider(market.provider, env, marketCache)
 
         if (typeof provider.getHistory !== 'function') {
           return json(
@@ -559,11 +560,13 @@ export default {
         const spotProvider = getMarketProvider(
           spotMarket.provider,
           env,
+          marketCache,
         )
 
         const futuresProvider = getMarketProvider(
           futuresMarket.provider,
           env,
+          marketCache,
         )
 
         if (
@@ -795,11 +798,13 @@ export default {
         const spotProvider = getMarketProvider(
           spotMarket.provider,
           env,
+          marketCache,
         )
 
         const futuresProvider = getMarketProvider(
           futuresMarket.provider,
           env,
+          marketCache,
         )
 
         const [spotQuote, futuresQuote] = await Promise.all([
@@ -868,7 +873,7 @@ export default {
           )
         }
 
-        const provider = getMarketProvider(market.provider, env)
+        const provider = getMarketProvider(market.provider, env, marketCache)
         const quote = await provider.getQuote(market.symbol)
 
         return json({
@@ -1963,7 +1968,7 @@ if (
           return json({ error: `Market symbol not found: ${symbol}` }, 404)
         }
 
-        const provider = getMarketProvider(market.provider, env)
+        const provider = getMarketProvider(market.provider, env, marketCache)
 
         if (typeof provider.getHistory !== 'function') {
           return json({ error: `Historical data is not supported for ${symbol}` }, 501)
@@ -3558,6 +3563,7 @@ if (
     const provider = getMarketProvider(
       market.provider,
       env,
+      marketCache,
     )
 
     if (!provider.getHistory) {

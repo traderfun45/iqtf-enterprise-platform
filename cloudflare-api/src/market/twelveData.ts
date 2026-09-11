@@ -43,7 +43,10 @@ function mapSymbol(symbol: string): string {
 }
 
 export class TwelveDataMarketProvider {
-  constructor(private readonly apiKey: string) {}
+  constructor(
+    private readonly apiKey: string,
+    private readonly cache?: Cache,
+  ) {}
 
   async getQuote(symbol: string): Promise<MarketQuote> {
     const providerSymbol = mapSymbol(symbol)
@@ -51,6 +54,22 @@ export class TwelveDataMarketProvider {
     const cached = quoteCache.get(providerSymbol)
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data
+    }
+
+    const cacheKey = new Request(
+      `https://iqtf-cache.local/quote/${encodeURIComponent(providerSymbol)}`,
+    )
+
+    if (this.cache) {
+      const shared = await this.cache.match(cacheKey)
+      if (shared) {
+        const data = (await shared.json()) as MarketQuote
+        quoteCache.set(providerSymbol, {
+          data,
+          expiresAt: Date.now() + QUOTE_CACHE_TTL,
+        })
+        return data
+      }
     }
 
     const controller = new AbortController()
@@ -97,6 +116,16 @@ export class TwelveDataMarketProvider {
         data: result,
         expiresAt: Date.now() + QUOTE_CACHE_TTL,
       })
+
+      if (this.cache) {
+        const response = new Response(JSON.stringify(result), {
+          headers: {
+            'content-type': 'application/json',
+            'cache-control': 'public, max-age=20',
+          },
+        })
+        await this.cache.put(cacheKey, response)
+      }
 
       return result
     } finally {

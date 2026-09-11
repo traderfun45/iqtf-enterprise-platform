@@ -34,6 +34,7 @@ export function getMarketProvider(
   env: {
     TWELVEDATA_API_KEY?: string
   },
+  cache?: Cache,
 ): MarketProvider {
   const provider = (providerName ?? 'mock').toLowerCase()
 
@@ -46,7 +47,7 @@ export function getMarketProvider(
       throw new Error('TWELVEDATA_API_KEY is not configured')
     }
 
-    return new TwelveDataMarketProvider(env.TWELVEDATA_API_KEY)
+    return new TwelveDataMarketProvider(env.TWELVEDATA_API_KEY, cache)
   }
 
   throw new Error(`Unsupported market provider: ${provider}`)
