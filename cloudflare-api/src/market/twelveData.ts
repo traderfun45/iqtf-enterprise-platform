@@ -141,6 +141,7 @@ export class TwelveDataMarketProvider {
 
     const interval = params.interval ?? '1h'
 
+    const providerInterval = interval === '5m' ? '5min' : interval === '15m' ? '15min' : interval === '1d' ? '1day' : interval
     const outputsize = Math.min(
       Math.max(params.outputsize ?? 100, 1),
       5000,
@@ -155,7 +156,7 @@ export class TwelveDataMarketProvider {
 
     const query = new URLSearchParams({
       symbol: providerSymbol,
-      interval,
+      interval: providerInterval,
       outputsize: String(outputsize),
       apikey: this.apiKey,
     })
