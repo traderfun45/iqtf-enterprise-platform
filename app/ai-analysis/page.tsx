@@ -1,6 +1,7 @@
 "use client"
 export const dynamic = "force-dynamic"
 import { useEffect, useState } from "react"
+import nextDynamic from "next/dynamic"
 import {
   Brain,
   TrendingUp,
@@ -28,7 +29,7 @@ import {
   type IntelligenceDecision,
 } from "@/lib/intelligence/decision"
 import { buildChartData } from "@/lib/intelligence/chart"
-import IqtfIntelligenceChart from "./IqtfIntelligenceChart"
+const IqtfIntelligenceChart = nextDynamic(() => import("./IqtfIntelligenceChart"), { ssr: false })
 
 function formatScore(value: number) {
   return value.toFixed(3)
