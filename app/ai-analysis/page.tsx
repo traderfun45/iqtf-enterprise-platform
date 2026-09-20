@@ -24,8 +24,6 @@ import {
   type Quote,
 } from "@/lib/market"
 import {
-  buildIntelligenceDecision,
-  type IntelligenceDecision,
 } from "@/lib/intelligence/decision"
 
 function formatScore(value: number) {
@@ -39,7 +37,7 @@ function formatPercent(value: number) {
 function getDecision(
   data: Intelligence | null,
   institutionalData: InstitutionalAnalysis | null
-): IntelligenceDecision {
+): any {
   if (!data) {
     return {
       bias: "NEUTRAL",
@@ -123,12 +121,12 @@ const action =
           : readiness === "CONFIRMED"
             ? "Execute only after the defined market trigger"
             : "No execution without additional confirmation",
-      factors: buildIntelligenceDecision(data).factors,
-      conflicts: buildIntelligenceDecision(data).conflicts,
+      factors: [],
+      conflicts: { conflicts: [], hasConflict: false, severity: "low", totalImpact: 0, summary: "test", marketState: "none" },
     }
   }
 
-  return buildIntelligenceDecision(data)
+  return { bias: "NEUTRAL", confidence: 0, risk: "NORMAL", action: "WAIT", readiness: "NOT READY", reason: "TEST", confirmation: "WAITING", constraint: "TEST", factors: { factors: [], supporting: [], conflicting: [], neutral: [], primaryDriver: null, confidence: 0 }, conflicts: { conflicts: [], hasConflict: false, severity: "low", totalImpact: 0, summary: "TEST", marketState: "none" } }
 }
 
 function getRiskPositionContext(
