@@ -304,7 +304,7 @@ export default function IqtfIntelligenceChart({
           </h2>
 
           <p className="mt-1 text-xs text-zinc-500">
-            XAUUSD 1H price · EMA50 / EMA200 · Expected Move zones
+            XAUUSD {timeframe} price · EMA50 / EMA200 · Expected Move zones
           </p>
         </div>
 

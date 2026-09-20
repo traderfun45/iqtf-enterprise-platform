@@ -1330,7 +1330,7 @@ const iqtf = institutionalData?.iqtfDecision ?? null
           </div>
         </div>
        
-        {false &&       <IqtfIntelligenceChart
+        {<IqtfIntelligenceChart
         data={chartData}
         expectedMoveData={expectedMoveData}
         timeframe={timeframe}
