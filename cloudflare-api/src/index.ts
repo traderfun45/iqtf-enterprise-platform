@@ -747,6 +747,7 @@ export default {
             price: futuresQuote.price,
             source: futuresQuote.source,
           },
+          basis,
           data: {
             '5m': fiveMinute,
             '15m': fifteenMinute,
