@@ -1329,12 +1329,12 @@ const iqtf = institutionalData?.iqtfDecision ?? null
           </div>
         </div>
        
-      <IqtfIntelligenceChart
-        data={chartData}
-        expectedMoveData={expectedMoveData}
-        timeframe={timeframe}
-        onTimeframeChange={setTimeframe}
-      />
+      {/* IQTF Intelligence Chart temporarily disabled for runtime isolation */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+        <p className="text-sm text-zinc-500">
+          Intelligence Chart test disabled
+        </p>
+      </div>
 
         {/* Signal */}
         <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
