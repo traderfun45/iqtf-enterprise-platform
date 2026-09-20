@@ -797,6 +797,8 @@ export default function AIAnalysisPage() {
 type AnalysisTimeframe = "5m" | "15m" | "1H" | "4H" | "D"
 
 const [timeframe, setTimeframe] = useState<AnalysisTimeframe>("1H")
+type SelectedSD = 1 | 2 | 3
+const [selectedSD, setSelectedSD] = useState<SelectedSD>(1)
 const [data, setData] = useState<Intelligence | null>(null)
 const [quote, setQuote] = useState<Quote | null>(null)
 const [cmeData, setCmeData] = useState<CmeAnalysis | null>(null)
@@ -810,6 +812,67 @@ const [refreshing, setRefreshing] = useState(false)
 const chartData = buildChartData(data)
 const [error, setError] = useState<string | null>(null)
 
+  const tradeLevels = (() => {
+    const item = expectedMoveData?.data[timeframe]
+    if (!item) return null
+
+    const atm = expectedMoveData?.anchor.price ?? item.price
+    const em = item.expectedMove
+    const sd = selectedSD
+
+    const entryBuy = item.levels[`minus${sd}` as "minus1" | "minus2" | "minus3"]
+    const entrySell = item.levels[`plus${sd}` as "plus1" | "plus2" | "plus3"]
+
+    const nextSd = sd + 1
+
+    const tp2Buy = nextSd <= 3
+      ? item.levels[`plus${nextSd}` as "plus1" | "plus2" | "plus3"]
+      : atm + em * 4
+
+    const tp2Sell = nextSd <= 3
+      ? item.levels[`minus${nextSd}` as "minus1" | "minus2" | "minus3"]
+      : atm - em * 4
+
+    return {
+      atm,
+      em,
+      selectedSD: sd,
+      buy: {
+        entry: entryBuy,
+        tp1: atm,
+        tp2: tp2Buy,
+        sl: entryBuy - em * sd * 0.5,
+      },
+      sell: {
+        entry: entrySell,
+        tp1: atm,
+        tp2: tp2Sell,
+        sl: entrySell + em * sd * 0.5,
+      },
+    }
+  })()
+
+
+  const realtimePrice = quote?.price ?? null
+
+  const realtimeBias =
+    tradeLevels && realtimePrice != null
+      ? realtimePrice > tradeLevels.atm
+        ? "BUY BIAS"
+        : realtimePrice < tradeLevels.atm
+          ? "SELL BIAS"
+          : "AT ATM"
+      : "WAITING"
+
+  const buyDistance =
+    tradeLevels && realtimePrice != null
+      ? realtimePrice - tradeLevels.buy.entry
+      : null
+
+  const sellDistance =
+    tradeLevels && realtimePrice != null
+      ? tradeLevels.sell.entry - realtimePrice
+      : null
 
   async function loadIntelligence(isInitialLoad = false) {
     try {
@@ -1132,6 +1195,211 @@ const iqtf = institutionalData?.iqtfDecision ?? null
             {data ? formatScore(data.trend.score) : "—"}
           </p>
         </div>
+      </div>
+
+      {/* Trade Level Engine */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Trade Level Engine
+            </h2>
+            <p className="text-xs text-zinc-500">
+              Real-Time Bias + Entry Boundary + TP1 / TP2 / SL
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-zinc-500">Selected SD</span>
+            {[1, 2, 3].map((sd) => (
+              <button
+                key={sd}
+                type="button"
+                onClick={() => setSelectedSD(sd as SelectedSD)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                  selectedSD === sd
+                    ? "bg-white text-black"
+                    : "border border-zinc-700 bg-zinc-900 text-zinc-300"
+                }`}
+              >
+                {sd} SD
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {!tradeLevels ? (
+          <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-center text-sm text-zinc-500">
+            Waiting for Expected Move data...
+          </div>
+        ) : (
+          <>
+            <div className="mt-5 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs text-zinc-500">Real-Time Price</p>
+                  <p className="mt-1 text-2xl font-bold text-white">
+                    {realtimePrice != null
+                      ? realtimePrice.toFixed(2)
+                      : "—"}
+                  </p>
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <p className="text-xs text-zinc-500">Real-Time Bias</p>
+                  <p
+                    className={`mt-1 text-lg font-bold ${
+                      realtimeBias === "BUY BIAS"
+                        ? "text-emerald-400"
+                        : realtimeBias === "SELL BIAS"
+                          ? "text-red-400"
+                          : "text-zinc-300"
+                    }`}
+                  >
+                    {realtimeBias === "BUY BIAS"
+                      ? "▲ BUY BIAS"
+                      : realtimeBias === "SELL BIAS"
+                        ? "▼ SELL BIAS"
+                        : realtimeBias}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/20 p-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-emerald-400">
+                    ▲ BUY PLAN
+                  </h3>
+                  <span className="text-xs text-zinc-500">
+                    {selectedSD} SD
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-zinc-500">Entry</p>
+                    <p className="mt-1 font-semibold text-white">
+                      {tradeLevels.buy.entry.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-zinc-500">Distance to Entry</p>
+                    <p className={`mt-1 font-semibold ${
+                      buyDistance != null && buyDistance >= 0
+                        ? "text-emerald-400"
+                        : "text-zinc-300"
+                    }`}>
+                      {buyDistance != null
+                        ? `${buyDistance >= 0 ? "+" : ""}${buyDistance.toFixed(2)}`
+                        : "—"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-zinc-500">TP1</p>
+                    <p className="mt-1 font-semibold text-white">
+                      {tradeLevels.buy.tp1.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-zinc-500">TP2</p>
+                    <p className="mt-1 font-semibold text-emerald-400">
+                      {tradeLevels.buy.tp2.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-zinc-500">SL</p>
+                    <p className="mt-1 font-semibold text-red-400">
+                      {tradeLevels.buy.sl.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-red-900/50 bg-red-950/20 p-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-red-400">
+                    ▼ SELL PLAN
+                  </h3>
+                  <span className="text-xs text-zinc-500">
+                    {selectedSD} SD
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-zinc-500">Entry</p>
+                    <p className="mt-1 font-semibold text-white">
+                      {tradeLevels.sell.entry.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-zinc-500">Distance to Entry</p>
+                    <p className={`mt-1 font-semibold ${
+                      sellDistance != null && sellDistance >= 0
+                        ? "text-red-400"
+                        : "text-zinc-300"
+                    }`}>
+                      {sellDistance != null
+                        ? `${sellDistance >= 0 ? "+" : ""}${sellDistance.toFixed(2)}`
+                        : "—"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-zinc-500">TP1</p>
+                    <p className="mt-1 font-semibold text-white">
+                      {tradeLevels.sell.tp1.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-zinc-500">TP2</p>
+                    <p className="mt-1 font-semibold text-emerald-400">
+                      {tradeLevels.sell.tp2.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-zinc-500">SL</p>
+                    <p className="mt-1 font-semibold text-red-400">
+                      {tradeLevels.sell.sl.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+                <p className="text-xs text-zinc-500">ATM</p>
+                <p className="mt-1 text-lg font-semibold text-white">
+                  {tradeLevels.atm.toFixed(2)}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+                <p className="text-xs text-zinc-500">Expected Move</p>
+                <p className="mt-1 text-lg font-semibold text-white">
+                  ±{tradeLevels.em.toFixed(2)}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+                <p className="text-xs text-zinc-500">Timeframe</p>
+                <p className="mt-1 text-lg font-semibold text-white">
+                  {timeframe}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Expected Move */}
