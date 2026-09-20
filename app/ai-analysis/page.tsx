@@ -792,8 +792,13 @@ if (alert.level === "HIGH") {
   }
 }
 
-export default function AIAnalysisPage() {
-
+export default function AIAnalysisPage()
+ {
+return (
+  <div className="p-6 text-white">
+    AI Analysis Runtime Test
+  </div>
+)
 type AnalysisTimeframe = "5m" | "15m" | "1H" | "4H" | "D"
 
 const [timeframe, setTimeframe] = useState<AnalysisTimeframe>("1H")
