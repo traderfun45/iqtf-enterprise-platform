@@ -399,7 +399,7 @@ function getAlertContext(
   riskPosition: ReturnType<typeof getRiskPositionContext>,
   tradePlan: ReturnType<typeof getTradePlan>,
   monitoring: ReturnType<typeof getMonitoringContext>,
-  iqtf: CmeAnalysis["iqtfDecision"] | null
+  iqtf: InstitutionalAnalysis["iqtfDecision"] | null
 ) {
   if (!data) {
     return {
@@ -496,7 +496,7 @@ function getActionContext(
   tradePlan: ReturnType<typeof getTradePlan>,
   monitoring: ReturnType<typeof getMonitoringContext>,
   alert: ReturnType<typeof getAlertContext>,
-  iqtf: CmeAnalysis["iqtfDecision"] | null
+  iqtf: InstitutionalAnalysis["iqtfDecision"] | null
 ) {
   if (!data) {
     return {
