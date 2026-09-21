@@ -1779,12 +1779,12 @@ const iqtf = institutionalData?.iqtfDecision ?? null
           IQTF Decision Breakdown
         </h2>
         <p className="text-xs text-zinc-500">
-          Composite decision from Market, CME and Vol2Vol evidence
+          Composite decision from Market, CME, Vol2Vol and COT evidence
         </p>
       </div>
     </div>
 
-    <div className="mt-5 grid gap-4 md:grid-cols-4">
+    <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       <div className="rounded-lg bg-zinc-900 p-4">
         <p className="text-xs text-zinc-500">Composite Score</p>
         <p className="mt-2 text-xl font-bold text-white">
@@ -1793,25 +1793,32 @@ const iqtf = institutionalData?.iqtfDecision ?? null
       </div>
 
       <div className="rounded-lg bg-zinc-900 p-4">
-        <p className="text-xs text-zinc-500">Market</p>
+        <p className="text-xs text-zinc-500">Market 35%</p>
         <p className="mt-2 text-xl font-bold text-white">
           {iqtf.components.market.toFixed(3)}
         </p>
       </div>
 
       <div className="rounded-lg bg-zinc-900 p-4">
-        <p className="text-xs text-zinc-500">CME</p>
+        <p className="text-xs text-zinc-500">CME 25%</p>
         <p className="mt-2 text-xl font-bold text-white">
           {iqtf.components.cme.toFixed(3)}
         </p>
       </div>
 
       <div className="rounded-lg bg-zinc-900 p-4">
-        <p className="text-xs text-zinc-500">Vol2Vol</p>
+        <p className="text-xs text-zinc-500">Vol2Vol 25%</p>
         <p className="mt-2 text-xl font-bold text-white">
           {iqtf.components.vol2vol.toFixed(3)}
         </p>
       </div>
+
+            <div className="rounded-lg bg-zinc-900 p-4">
+              <p className="text-xs text-zinc-500">COT 15%</p>
+              <p className="mt-2 text-xl font-bold text-white">
+                {iqtf.components.cot.toFixed(3)}
+              </p>
+            </div>
     </div>
 
     {iqtf.reasons.length > 0 && (

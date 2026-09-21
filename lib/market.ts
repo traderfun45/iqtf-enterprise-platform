@@ -212,6 +212,7 @@ export type CmeAnalysis = {
       market: number
       cme: number
       vol2vol: number
+      cot: number
     }
     reasons: string[]
     warnings: string[]
