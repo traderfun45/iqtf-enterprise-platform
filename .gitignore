@@ -98,3 +98,22 @@ next-env.d.ts
 *.openrouter-402-backup
 *.ck
 /core
+
+# IQTF local diagnostic / API test artifacts
+/ai.json
+/cme-intelligence.json
+/cme-ocr.json
+/cot-*.json
+/cot-*.txt
+/institutional.json
+/nvidia-json-test*.json
+/nvidia-json-test-result.txt
+/openrouter-cme-test.json
+/openrouter-cme-result.txt
+/request-vol2vol-*.json
+/result-vol2vol-*.json
+/test-expected-move.ts
+/tmp/
+/scripts/ocr-matrix/
+
+/nvidia-models.json
