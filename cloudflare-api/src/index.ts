@@ -10,6 +10,7 @@ import { getMarketProvider } from './market/provider.js'
 import { calculateMarketIntelligence } from './services/market/intelligence.js'
 import { calculateExpectedMove, aggregate4H } from './services/market/expectedMove.js'
 import { calculateGoldBasis } from './services/market/goldBasis.js'
+import { runTradeLevelBacktest } from './services/backtest/tradeLevelBacktest.js'
 import { analyzeCmeIntelligence } from './services/cmeIntelligence.js'
 import { analyzeVol2Vol } from './services/vol2vol.js'
 import { analyzeCotIntelligence } from './services/cotIntelligence.js'
@@ -766,6 +767,191 @@ export default {
               error instanceof Error
                 ? error.message
                 : 'XAUUSD Expected Move calculation error',
+          },
+          502,
+        )
+      }
+    }
+
+    // =========================================================
+    // GET /api/backtest/trade-level
+    // Historical XAUUSD + GC Trade Level Backtest
+    // =========================================================
+    if (
+      url.pathname === '/api/backtest/trade-level' &&
+      request.method === 'GET'
+    ) {
+      try {
+        const symbol = (
+          url.searchParams.get('symbol') || 'XAUUSD'
+        ).toUpperCase()
+
+        const timeframeParam = (
+          url.searchParams.get('timeframe') || '1H'
+        ).toUpperCase()
+
+        const daysParam = Number(
+          url.searchParams.get('days') || '60',
+        )
+
+        const sdParam = Number(
+          url.searchParams.get('sd') || '1',
+        )
+
+        if (symbol !== 'XAUUSD') {
+          return json(
+            {
+              success: false,
+              error: 'Backtest currently supports XAUUSD only',
+            },
+            400,
+          )
+        }
+
+        if (timeframeParam !== '1H') {
+          return json(
+            {
+              success: false,
+              error: 'Backtest currently supports 1H only',
+            },
+            400,
+          )
+        }
+
+        if (
+          !Number.isFinite(daysParam) ||
+          daysParam < 1 ||
+          daysParam > 365
+        ) {
+          return json(
+            {
+              success: false,
+              error: 'days must be between 1 and 365',
+            },
+            400,
+          )
+        }
+
+        if (![1, 2, 3].includes(sdParam)) {
+          return json(
+            {
+              success: false,
+              error: 'sd must be 1, 2, or 3',
+            },
+            400,
+          )
+        }
+
+        const spotMarket = await getMarketBySymbol(
+          env.DB,
+          'XAUUSD',
+        )
+
+        const futuresMarket = await getMarketBySymbol(
+          env.DB,
+          'GC',
+        )
+
+        if (!spotMarket || !futuresMarket) {
+          return json(
+            {
+              success: false,
+              error: 'Gold markets not found',
+              spot: 'XAUUSD',
+              futures: 'GC',
+            },
+            404,
+          )
+        }
+
+        const spotProvider = getMarketProvider(
+          spotMarket.provider,
+          env,
+          marketCache,
+        )
+
+        const futuresProvider = getMarketProvider(
+          futuresMarket.provider,
+          env,
+          marketCache,
+        )
+
+        if (
+          typeof spotProvider.getHistory !== 'function' ||
+          typeof futuresProvider.getHistory !== 'function'
+        ) {
+          return json(
+            {
+              success: false,
+              error: 'Historical market data is not supported',
+            },
+            501,
+          )
+        }
+
+        const outputsize = Math.min(
+          5000,
+          Math.ceil(daysParam * 24) + 100,
+        )
+
+        const [xauCandles, gcCandles] = await Promise.all([
+          spotProvider.getHistory('XAUUSD', {
+            interval: '1h',
+            outputsize,
+          }),
+          futuresProvider.getHistory('GC', {
+            interval: '1h',
+            outputsize,
+          }),
+        ])
+
+        if (xauCandles.length < 16) {
+          return json(
+            {
+              success: false,
+              error: 'Insufficient XAUUSD historical data',
+              candleCount: xauCandles.length,
+            },
+            502,
+          )
+        }
+
+        if (gcCandles.length < 15) {
+          return json(
+            {
+              success: false,
+              error: 'Insufficient GC historical data',
+              candleCount: gcCandles.length,
+            },
+            502,
+          )
+        }
+
+        const result = runTradeLevelBacktest(
+          xauCandles,
+          gcCandles,
+          '1H',
+          sdParam as 1 | 2 | 3,
+        )
+
+        return json({
+          success: true,
+          symbol: 'XAUUSD',
+          timeframe: '1H',
+          days: daysParam,
+          selectedSd: sdParam,
+          data: result,
+          timestamp: new Date().toISOString(),
+        })
+      } catch (error) {
+        return json(
+          {
+            success: false,
+            error: 'Trade Level Backtest unavailable',
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Trade Level Backtest calculation error',
           },
           502,
         )
