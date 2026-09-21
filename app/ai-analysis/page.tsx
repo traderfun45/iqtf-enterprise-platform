@@ -1719,7 +1719,13 @@ const iqtf = institutionalData?.iqtfDecision ?? null
             </p>
 
             <p className={`mt-2 text-xl font-bold ${decisionColor}`}>
-              {decision.bias}
+              {iqtf
+  ? iqtf.decision === "LONG" || iqtf.decision === "LONG_WATCH"
+    ? "BULLISH"
+    : iqtf.decision === "SHORT" || iqtf.decision === "SHORT_WATCH"
+      ? "BEARISH"
+      : "NEUTRAL"
+  : decision.bias}
             </p>
           </div>
 
@@ -1729,7 +1735,7 @@ const iqtf = institutionalData?.iqtfDecision ?? null
             </p>
 
             <p className="mt-2 text-xl font-bold text-white">
-              {data ? `${decision.confidence}%` : "—"}
+              {iqtf ? `${iqtf.confidence}%` : data ? `${decision.confidence}%` : "—"}
             </p>
           </div>
 
@@ -1751,7 +1757,7 @@ const iqtf = institutionalData?.iqtfDecision ?? null
             </p>
 
             <p className={`mt-2 text-xl font-bold ${decisionColor}`}>
-              {decision.action}
+              {iqtf?.decision ?? decision.action}
             </p>
           </div>
         </div>
@@ -1761,9 +1767,13 @@ const iqtf = institutionalData?.iqtfDecision ?? null
             <span className="font-semibold text-white">
               Decision rationale:
             </span>{" "}
-            {decision.action === "WAIT"
-              ? "Current trend and score do not provide sufficient confirmation for an aggressive directional decision."
-              : `Current intelligence supports a ${decision.action.toLowerCase()} with ${decision.risk.toLowerCase()} risk conditions.`}
+            {iqtf
+                      ? iqtf.reasons.length > 0
+                        ? iqtf.reasons.join(" · ")
+                        : "Backend IQTF decision is active"
+                      : decision.action === "WAIT"
+                        ? "Current trend and score do not provide sufficient confirmation for an aggressive directional decision."
+                        : `Current intelligence supports a ${decision.action.toLowerCase()} with ${decision.risk.toLowerCase()} risk conditions.`}
           </div>
         )}
       </div>
