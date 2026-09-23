@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import {
   CandlestickSeries,
   LineSeries,
@@ -69,7 +69,7 @@ export default function IqtfIntelligenceChart({
   /*
    * Create Lightweight Charts instance once.
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current
 
     if (!container || chartRef.current) {
@@ -250,7 +250,7 @@ export default function IqtfIntelligenceChart({
   /*
    * Update candle + EMA data.
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const candleSeries = candleSeriesRef.current
     const ema50Series = ema50SeriesRef.current
     const ema200Series = ema200SeriesRef.current
