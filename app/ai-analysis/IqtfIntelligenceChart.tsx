@@ -22,14 +22,20 @@ type Props = {
   onTimeframeChange: (timeframe: Timeframe) => void
 }
 
-function toTime(timestamp: string): Time {
+function toTime(timestamp: string): Time | null {
   const milliseconds = new Date(timestamp).getTime()
 
   if (!Number.isFinite(milliseconds)) {
-    return 0 as Time
+    return null
   }
 
-  return Math.floor(milliseconds / 1000) as Time
+  const seconds = Math.floor(milliseconds / 1000)
+
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return null
+  }
+
+  return seconds as Time
 }
 
 export default function IqtfIntelligenceChart({
@@ -254,50 +260,85 @@ export default function IqtfIntelligenceChart({
       return
     }
 
-    const candleData = data
-      .map((point) => ({
-        time: toTime(point.timestamp),
+    const candleMap = new Map<number, {
+      time: Time
+      open: number
+      high: number
+      low: number
+      close: number
+    }>()
+
+    for (const point of data) {
+      const time = toTime(point.timestamp)
+
+      if (
+        time == null ||
+        !Number.isFinite(point.open) ||
+        !Number.isFinite(point.high) ||
+        !Number.isFinite(point.low) ||
+        !Number.isFinite(point.close)
+      ) {
+        continue
+      }
+
+      candleMap.set(Number(time), {
+        time,
         open: point.open,
         high: point.high,
         low: point.low,
         close: point.close,
-      }))
-      .filter(
-        (point) =>
-          point.time !== (0 as Time) &&
-          Number.isFinite(point.open) &&
-          Number.isFinite(point.high) &&
-          Number.isFinite(point.low) &&
-          Number.isFinite(point.close)
-      )
+      })
+    }
 
-    const ema50Data = data
-      .filter(
-        (point) =>
-          point.ema50 != null &&
-          Number.isFinite(point.ema50)
-      )
-      .map((point) => ({
-        time: toTime(point.timestamp),
-        value: point.ema50 as number,
-      }))
-      .filter(
-        (point) => point.time !== (0 as Time)
-      )
+    const candleData = Array.from(candleMap.values()).sort(
+      (a, b) => Number(a.time) - Number(b.time)
+    )
 
-    const ema200Data = data
-      .filter(
-        (point) =>
-          point.ema200 != null &&
-          Number.isFinite(point.ema200)
-      )
-      .map((point) => ({
-        time: toTime(point.timestamp),
-        value: point.ema200 as number,
-      }))
-      .filter(
-        (point) => point.time !== (0 as Time)
-      )
+    const ema50Map = new Map<number, {
+      time: Time
+      value: number
+    }>()
+
+    const ema200Map = new Map<number, {
+      time: Time
+      value: number
+    }>()
+
+    for (const point of data) {
+      const time = toTime(point.timestamp)
+
+      if (time == null) {
+        continue
+      }
+
+      if (
+        point.ema50 != null &&
+        Number.isFinite(point.ema50)
+      ) {
+        ema50Map.set(Number(time), {
+          time,
+          value: point.ema50,
+        })
+      }
+
+      if (
+        point.ema200 != null &&
+        Number.isFinite(point.ema200)
+      ) {
+        ema200Map.set(Number(time), {
+          time,
+          value: point.ema200,
+        })
+      }
+    }
+
+    const ema50Data = Array.from(ema50Map.values()).sort(
+      (a, b) => Number(a.time) - Number(b.time)
+    )
+
+    const ema200Data = Array.from(ema200Map.values()).sort(
+      (a, b) => Number(a.time) - Number(b.time)
+    )
 
     candleSeries.setData(candleData)
     ema50Series.setData(ema50Data)
@@ -472,7 +513,7 @@ export default function IqtfIntelligenceChart({
         className={
           fullscreen
             ? "mt-2 min-h-0 flex-1 overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
-            : "mt-4 overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
+            : "mt-4 h-[430px] overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
         }
       />
 
