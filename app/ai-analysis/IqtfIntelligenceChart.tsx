@@ -488,15 +488,7 @@ export default function IqtfIntelligenceChart({
     )
   }, [item, chartReady])
 
-  if (data.length === 0) {
-    return (
-      <div className="flex min-h-[430px] items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950 text-sm text-zinc-500">
-        Chart data unavailable
-      </div>
-    )
-  }
-
-  const latest = data[data.length - 1]
+  const latest = data[data.length - 1] ?? null
 
   return (
     <div
@@ -554,34 +546,42 @@ export default function IqtfIntelligenceChart({
         </div>
       </div>
 
-      <div
-        ref={containerRef}
+      <div className="relative">
+        <div
+          ref={containerRef}
         className={
           fullscreen
             ? "mt-2 min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
             : "mt-4 h-[430px] min-w-0 w-full overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
         }
-      />
+        />
+
+        {data.length === 0 && (
+          <div className="absolute inset-0 mt-4 flex items-center justify-center rounded-lg border border-zinc-900 bg-zinc-950/80 text-sm text-zinc-500">
+            Loading chart data…
+          </div>
+        )}
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-zinc-500">
         <span>
           Price{" "}
           <strong className="text-white">
-            {latest.price.toFixed(2)}
+            {latest?.price.toFixed(2) ?? "—"}
           </strong>
         </span>
 
         <span>
           EMA50{" "}
           <strong className="text-zinc-300">
-            {latest.ema50?.toFixed(2) ?? "—"}
+            {latest?.ema50?.toFixed(2) ?? "—"}
           </strong>
         </span>
 
         <span>
           EMA200{" "}
           <strong className="text-zinc-400">
-            {latest.ema200?.toFixed(2) ?? "—"}
+            {latest?.ema200?.toFixed(2) ?? "—"}
           </strong>
         </span>
 
