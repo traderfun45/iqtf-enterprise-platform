@@ -185,11 +185,14 @@ export default function IqtfIntelligenceChart({
         return
       }
 
+      const width = Math.max(1, currentContainer.clientWidth)
+      const height = fullscreen
+        ? Math.max(300, currentContainer.clientHeight)
+        : Math.max(300, currentContainer.clientHeight || 430)
+
       currentChart.applyOptions({
-        width: Math.max(1, currentContainer.clientWidth),
-        height: fullscreen
-          ? Math.max(300, currentContainer.clientHeight)
-          : 430,
+        width,
+        height,
       })
     })
 
@@ -512,8 +515,8 @@ export default function IqtfIntelligenceChart({
         ref={containerRef}
         className={
           fullscreen
-            ? "mt-2 min-h-0 flex-1 overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
-            : "mt-4 h-[430px] overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
+            ? "mt-2 min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
+            : "mt-4 h-[430px] min-w-0 w-full overflow-hidden rounded-lg border border-zinc-900 bg-black/20"
         }
       />
 
