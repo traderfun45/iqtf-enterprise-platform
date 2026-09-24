@@ -67,7 +67,7 @@ export default function IqtfIntelligenceChart({
   const item = expectedMoveData?.data[timeframe] ?? null
 
   /*
-   * Create Lightweight Charts instance once.
+   * Create Lightweight Charts after the container has a real layout size.
    */
   useLayoutEffect(() => {
     const container = containerRef.current
@@ -76,134 +76,173 @@ export default function IqtfIntelligenceChart({
       return
     }
 
-    const chart = createChart(container, {
-      width: Math.max(1, container.clientWidth),
-      height: 430,
+    let resizeObserver: ResizeObserver | null = null
+    let frameId = 0
 
-      layout: {
-        background: {
-          color: "transparent",
-        },
-        textColor: "#a1a1aa",
-      },
+    const create = () => {
+      const width = container.clientWidth
+      const height = container.clientHeight
 
-      grid: {
-        vertLines: {
-          color: "rgba(63, 63, 70, 0.25)",
-        },
-        horzLines: {
-          color: "rgba(63, 63, 70, 0.25)",
-        },
-      },
-
-      rightPriceScale: {
-        borderColor: "rgba(63, 63, 70, 0.5)",
-        scaleMargins: {
-          top: 0.08,
-          bottom: 0.08,
-        },
-      },
-
-      timeScale: {
-        borderColor: "rgba(63, 63, 70, 0.5)",
-        timeVisible: true,
-        secondsVisible: false,
-        rightOffset: 5,
-        barSpacing: 7,
-        minBarSpacing: 2,
-      },
-
-      crosshair: {
-        mode: 0,
-
-        vertLine: {
-          color: "rgba(161, 161, 170, 0.45)",
-          width: 1,
-          style: 2,
-          labelBackgroundColor: "#27272a",
-        },
-
-        horzLine: {
-          color: "rgba(161, 161, 170, 0.45)",
-          width: 1,
-          style: 2,
-          labelBackgroundColor: "#27272a",
-        },
-      },
-
-      handleScroll: {
-        mouseWheel: true,
-        pressedMouseMove: true,
-        horzTouchDrag: true,
-        vertTouchDrag: true,
-      },
-
-      handleScale: {
-        axisPressedMouseMove: true,
-        mouseWheel: true,
-        pinch: true,
-      },
-    })
-
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#22c55e",
-      downColor: "#ef4444",
-      borderUpColor: "#22c55e",
-      borderDownColor: "#ef4444",
-      wickUpColor: "#22c55e",
-      wickDownColor: "#ef4444",
-      priceLineVisible: false,
-      lastValueVisible: true,
-    })
-
-    const ema50Series = chart.addSeries(LineSeries, {
-      color: "#d4d4d8",
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: false,
-    })
-
-    const ema200Series = chart.addSeries(LineSeries, {
-      color: "#71717a",
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: false,
-    })
-
-    chartRef.current = chart
-    candleSeriesRef.current = candleSeries
-    ema50SeriesRef.current = ema50Series
-    ema200SeriesRef.current = ema200Series
-
-    const resizeObserver = new ResizeObserver(() => {
-      const currentContainer = containerRef.current
-      const currentChart = chartRef.current
-
-      if (!currentContainer || !currentChart) {
+      if (width <= 0 || height <= 0) {
+        frameId = requestAnimationFrame(create)
         return
       }
 
-      const width = Math.max(1, currentContainer.clientWidth)
-      const height = fullscreen
-        ? Math.max(300, currentContainer.clientHeight)
-        : Math.max(300, currentContainer.clientHeight || 430)
-
-      currentChart.applyOptions({
+      const chart = createChart(container, {
         width,
         height,
-      })
-    })
 
-    resizeObserver.observe(container)
+        layout: {
+          background: {
+            color: "transparent",
+          },
+          textColor: "#a1a1aa",
+        },
+
+        grid: {
+          vertLines: {
+            color: "rgba(63, 63, 70, 0.25)",
+          },
+          horzLines: {
+            color: "rgba(63, 63, 70, 0.25)",
+          },
+        },
+
+        rightPriceScale: {
+          borderColor: "rgba(63, 63, 70, 0.5)",
+          scaleMargins: {
+            top: 0.08,
+            bottom: 0.08,
+          },
+        },
+
+        timeScale: {
+          borderColor: "rgba(63, 63, 70, 0.5)",
+          timeVisible: true,
+          secondsVisible: false,
+          rightOffset: 5,
+          barSpacing: 7,
+          minBarSpacing: 2,
+        },
+
+        crosshair: {
+          mode: 0,
+
+          vertLine: {
+            color: "rgba(161, 161, 170, 0.45)",
+            width: 1,
+            style: 2,
+            labelBackgroundColor: "#27272a",
+          },
+
+          horzLine: {
+            color: "rgba(161, 161, 170, 0.45)",
+            width: 1,
+            style: 2,
+            labelBackgroundColor: "#27272a",
+          },
+        },
+
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: true,
+        },
+
+        handleScale: {
+          axisPressedMouseMove: true,
+          mouseWheel: true,
+          pinch: true,
+        },
+      })
+
+      const candleSeries = chart.addSeries(CandlestickSeries, {
+        upColor: "#22c55e",
+        downColor: "#ef4444",
+        borderUpColor: "#22c55e",
+        borderDownColor: "#ef4444",
+        wickUpColor: "#22c55e",
+        wickDownColor: "#ef4444",
+        priceLineVisible: false,
+        lastValueVisible: true,
+      })
+
+      const ema50Series = chart.addSeries(LineSeries, {
+        color: "#d4d4d8",
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      })
+
+      const ema200Series = chart.addSeries(LineSeries, {
+        color: "#71717a",
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      })
+
+      chartRef.current = chart
+      candleSeriesRef.current = candleSeries
+      ema50SeriesRef.current = ema50Series
+      ema200SeriesRef.current = ema200Series
+
+      resizeObserver = new ResizeObserver(() => {
+        const currentContainer = containerRef.current
+        const currentChart = chartRef.current
+
+        if (!currentContainer || !currentChart) {
+          return
+        }
+
+        const nextWidth = currentContainer.clientWidth
+        const nextHeight = currentContainer.clientHeight
+
+        if (nextWidth <= 0 || nextHeight <= 0) {
+          return
+        }
+
+        currentChart.applyOptions({
+          width: nextWidth,
+          height: nextHeight,
+        })
+      })
+
+      resizeObserver.observe(container)
+
+      requestAnimationFrame(() => {
+        const currentContainer = containerRef.current
+        const currentChart = chartRef.current
+
+        if (!currentContainer || !currentChart) {
+          return
+        }
+
+        const nextWidth = currentContainer.clientWidth
+        const nextHeight = currentContainer.clientHeight
+
+        if (nextWidth > 0 && nextHeight > 0) {
+          currentChart.applyOptions({
+            width: nextWidth,
+            height: nextHeight,
+          })
+
+          currentChart.timeScale().fitContent()
+        }
+      })
+    }
+
+    frameId = requestAnimationFrame(create)
 
     return () => {
-      resizeObserver.disconnect()
+      cancelAnimationFrame(frameId)
+      resizeObserver?.disconnect()
 
       for (const line of priceLinesRef.current) {
         try {
-          candleSeries.removePriceLine(line)
+          candleSeriesRef.current?.removePriceLine(line)
         } catch {
           // Ignore during chart destruction.
         }
@@ -211,7 +250,7 @@ export default function IqtfIntelligenceChart({
 
       priceLinesRef.current = []
 
-      chart.remove()
+      chartRef.current?.remove()
 
       chartRef.current = null
       candleSeriesRef.current = null
