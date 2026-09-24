@@ -63,6 +63,7 @@ export default function IqtfIntelligenceChart({
   >([])
 
   const [fullscreen, setFullscreen] = useState(false)
+  const [chartReady, setChartReady] = useState(false)
 
   const item = expectedMoveData?.data[timeframe] ?? null
 
@@ -189,6 +190,8 @@ export default function IqtfIntelligenceChart({
       ema50SeriesRef.current = ema50Series
       ema200SeriesRef.current = ema200Series
 
+      setChartReady(true)
+
       resizeObserver = new ResizeObserver(() => {
         const currentContainer = containerRef.current
         const currentChart = chartRef.current
@@ -256,6 +259,7 @@ export default function IqtfIntelligenceChart({
       candleSeriesRef.current = null
       ema50SeriesRef.current = null
       ema200SeriesRef.current = null
+      setChartReady(false)
     }
   }, [])
 
@@ -389,7 +393,7 @@ export default function IqtfIntelligenceChart({
     if (candleData.length > 0) {
       chart.timeScale().fitContent()
     }
-  }, [data])
+  }, [data, chartReady])
 
   /*
    * Expected Move price levels.
@@ -482,7 +486,7 @@ export default function IqtfIntelligenceChart({
         title: level.title,
       })
     )
-  }, [item])
+  }, [item, chartReady])
 
   if (data.length === 0) {
     return (
